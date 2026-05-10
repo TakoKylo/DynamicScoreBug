@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net4.8</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <OutputPath>C:\Program Files (x86)\Steam\steamapps\common\Puck\Plugins\ScoreBug\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  </PropertyGroup>
+
+ <PropertyGroup>
+  <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+</PropertyGroup>
+
+<PropertyGroup>
+  <Description>Custom broadcast scoreboard for Puck hockey games with team logos and real-time updates.</Description>
+</PropertyGroup>
+
+  <ItemGroup>
+    <!-- Exclude game source files - we only reference the compiled DLLs -->
+    <Compile Remove="Puck\**" />
+    <EmbeddedResource Remove="Puck\**" />
+    <None Remove="Puck\**" />
+    
+    <!-- Exclude decompiled files and documentation - for reference only -->
+    <Compile Remove="ToasterReskinLoader_Decompiled\**" />
+    <None Remove="ToasterReskinLoader_Decompiled\**" />
+    
+    <!-- Exclude integration documentation - not source code -->
+    <Compile Remove="src\Integration\README.md" />
+
+    <!-- Also copy to scorebuglogos subfolder -->
+    <None Include="scorebuglogos\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>scorebuglogos\%(Filename)%(Extension)</Link>
+    </None>
+    
+    <!-- Include JSON config defaults to be copied to output -->
+    <None Include="CustomScoreboard.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="ScoreboardPresets.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reference all game libs from libs/, but DO NOT copy them next to the plugin -->
+    <Libs Include="libs\*.dll" Exclude="libs\System.*.dll"/>
+    <Reference Include="@(Libs)">
+      <HintPath>%(Libs.FullPath)</HintPath>
+      <Private>false</Private> <!-- critical: prevents copying, avoids type identity split -->
+    </Reference>
+
+    <!-- oomtm450PuckMod_Stats is loaded at runtime via Type.GetType reflection in
+         StatsIntegration.cs, so no compile-time reference is needed. -->
+  </ItemGroup>
+
+</Project>

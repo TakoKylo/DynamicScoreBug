@@ -1,0 +1,25 @@
+# Build artifacts
+bin/
+obj/
+*.user
+*.suo
+
+# Game DLLs — copy these from your local Puck install (see README).
+# Redistributing the game's compiled assemblies publicly violates the EULA.
+libs/
+
+# Decompiled third-party mod source — kept locally for reference, not redistributed.
+ToasterReskinLoader_Decompiled/
+
+# IDE / editor
+.vs/
+.idea/
+.vscode/
+*.swp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
