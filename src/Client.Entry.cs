@@ -6,7 +6,7 @@ using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UIElements;
 
-public sealed partial class Scoreboard_ClientMod : global::IPuckMod
+public sealed partial class Scoreboard_ClientMod : global::IPuckPlugin
 {
     private GameObject _host;
     private Harmony _harmony;

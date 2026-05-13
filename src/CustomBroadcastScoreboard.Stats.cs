@@ -100,7 +100,7 @@ namespace CustomScoreboard.UI
                                     string text = label.text.Trim();
                                     
                                     // Check if it's a decimal number between 0 and 1
-                                    if (text.Contains(".") && float.TryParse(text, out float savePercent))
+                                    if (text.Contains(".") && float.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float savePercent))
                                     {
                                         if (savePercent >= 0f && savePercent <= 1f)
                                         {
@@ -119,334 +119,42 @@ namespace CustomScoreboard.UI
         }
 
         // ============================================
-        // STATS DISPLAY HELPERS
-        // ============================================
-
-        private string FormatPlayerStatsSection()
-        {
-            System.Text.StringBuilder sb = new System.Text.StringBuilder();
-            sb.AppendLine("=== PLAYER STATISTICS ===");
-            
-            // Check if advanced stats are available (any player has non-zero values)
-            bool hasAdvancedStats = playerHits.Values.Any(v => v > 0) || 
-                                     playerPasses.Values.Any(v => v > 0) || 
-                                     playerBlocks.Values.Any(v => v > 0) || 
-                                     playerTakeaways.Values.Any(v => v > 0) || 
-                                     playerTurnovers.Values.Any(v => v > 0);
-            
-            // Check if extended stats are available
-            bool hasExtendedStats = playerPlusMinus.Count > 0 || 
-                                    playerTimeOnIce.Values.Any(v => v > 0) ||
-                                    playerPuckBattleWins.Values.Any(v => v > 0);
-            
-            if (MonoBehaviourSingleton<PlayerManager>.Instance != null)
-            {
-                var players = MonoBehaviourSingleton<PlayerManager>.Instance.GetPlayers(false);
-                
-                // Build combined lists (current + disconnected) for each team
-                var allBluePlayers = new List<(string name, int number, PlayerRole role, int goals, int assists, int shots, string steamId, string position, bool isDisconnected)>();
-                var allRedPlayers = new List<(string name, int number, PlayerRole role, int goals, int assists, int shots, string steamId, string position, bool isDisconnected)>();
-                
-                // Add current players
-                foreach (var player in players)
-                {
-                    ulong clientId = player.OwnerClientId;
-                    string steamId = player.SteamId.Value.ToString();
-                    string position = GetPlayerPosition(player);
-                    
-                    // Get shots from playerSOG (by Steam ID) first, fallback to playerShots (by client ID)
-                    int shots = 0;
-                    if (playerSOG.ContainsKey(steamId))
-                        shots = playerSOG[steamId];
-                    else if (playerShots.ContainsKey(clientId))
-                        shots = playerShots[clientId];
-                    
-                    if (player.Team == PlayerTeam.Blue)
-                        allBluePlayers.Add((player.Username.Value.ToString(), player.Number.Value, player.Role, player.Goals.Value, player.Assists.Value, shots, steamId, position, false));
-                    else if (player.Team == PlayerTeam.Red)
-                        allRedPlayers.Add((player.Username.Value.ToString(), player.Number.Value, player.Role, player.Goals.Value, player.Assists.Value, shots, steamId, position, false));
-                }
-                
-                // Add disconnected players from cache - also check playerSOG for shots
-                foreach (var kvp in cachedPlayerStats)
-                {
-                    var (name, number, team, role, goals, assists, shots, steamId, position) = kvp.Value;
-                    
-                    // Check if playerSOG has more recent shot data
-                    int actualShots = shots;
-                    if (!string.IsNullOrEmpty(steamId) && playerSOG.ContainsKey(steamId))
-                        actualShots = playerSOG[steamId];
-                    
-                    // Only add if not already in current players list
-                    if (team == PlayerTeam.Blue && !allBluePlayers.Any(p => p.name == name))
-                        allBluePlayers.Add((name, number, role, goals, assists, actualShots, steamId, position, true));
-                    else if (team == PlayerTeam.Red && !allRedPlayers.Any(p => p.name == name))
-                        allRedPlayers.Add((name, number, role, goals, assists, actualShots, steamId, position, true));
-                }
-                
-                // Blue team - separate skaters and goalies
-                var blueSkaters = allBluePlayers.Where(p => p.role == PlayerRole.Attacker).ToList();
-                var blueGoalies = allBluePlayers.Where(p => p.role == PlayerRole.Goalie).ToList();
-                
-                // Blue team skaters
-                if (blueSkaters.Count > 0)
-                {
-                    sb.AppendLine($"{config.blueTeamName} Players:");
-                    foreach (var playerData in blueSkaters)
-                    {
-                        int points = playerData.goals + playerData.assists;
-                        float shotPercent = playerData.shots > 0 ? (float)playerData.goals / playerData.shots * 100f : 0f;
-                        
-                        // Get additional stats from Stats mod
-                        int hits = !string.IsNullOrEmpty(playerData.steamId) && playerHits.ContainsKey(playerData.steamId) ? playerHits[playerData.steamId] : 0;
-                        int passes = !string.IsNullOrEmpty(playerData.steamId) && playerPasses.ContainsKey(playerData.steamId) ? playerPasses[playerData.steamId] : 0;
-                        int blocks = !string.IsNullOrEmpty(playerData.steamId) && playerBlocks.ContainsKey(playerData.steamId) ? playerBlocks[playerData.steamId] : 0;
-                        int takeaways = !string.IsNullOrEmpty(playerData.steamId) && playerTakeaways.ContainsKey(playerData.steamId) ? playerTakeaways[playerData.steamId] : 0;
-                        int turnovers = !string.IsNullOrEmpty(playerData.steamId) && playerTurnovers.ContainsKey(playerData.steamId) ? playerTurnovers[playerData.steamId] : 0;
-                        
-                        // Get extended stats
-                        int plusMinus = !string.IsNullOrEmpty(playerData.steamId) && playerPlusMinus.ContainsKey(playerData.steamId) ? playerPlusMinus[playerData.steamId] : 0;
-                        double toi = !string.IsNullOrEmpty(playerData.steamId) && playerTimeOnIce.ContainsKey(playerData.steamId) ? playerTimeOnIce[playerData.steamId] : 0;
-                        int puckBattleWins = !string.IsNullOrEmpty(playerData.steamId) && playerPuckBattleWins.ContainsKey(playerData.steamId) ? playerPuckBattleWins[playerData.steamId] : 0;
-                        int puckBattleLosses = !string.IsNullOrEmpty(playerData.steamId) && playerPuckBattleLosses.ContainsKey(playerData.steamId) ? playerPuckBattleLosses[playerData.steamId] : 0;
-                        
-                        // Format with Steam ID and abbreviated position (DC for disconnected)
-                        string displayPosition = playerData.isDisconnected ? "DC" : playerData.position;
-                        string playerInfo = $"#{playerData.number.ToString().PadLeft(2)} {playerData.name.PadRight(20)} ({displayPosition.PadRight(2)}) [{playerData.steamId}]";
-                        
-                        // Format +/- with sign
-                        string plusMinusStr = plusMinus >= 0 ? $"+{plusMinus}" : plusMinus.ToString();
-                        string scoring = $"{playerData.goals}G {playerData.assists}A {points}P {plusMinusStr} {playerData.shots}S {shotPercent:0.0}%".PadRight(30);
-                        
-                        if (hasAdvancedStats || hasExtendedStats)
-                        {
-                            var statParts = new List<string>();
-                            if (hasAdvancedStats)
-                            {
-                                statParts.Add($"{hits}H {passes}Pas {blocks}Blk {takeaways}TA {turnovers}TO");
-                            }
-                            if (hasExtendedStats && toi > 0)
-                            {
-                                int toiMinutes = (int)(toi / 60);
-                                int toiSeconds = (int)(toi % 60);
-                                statParts.Add($"TOI:{toiMinutes}:{toiSeconds:D2}");
-                            }
-                            if (hasExtendedStats && (puckBattleWins > 0 || puckBattleLosses > 0))
-                            {
-                                statParts.Add($"PB:{puckBattleWins}-{puckBattleLosses}");
-                            }
-                            sb.AppendLine($"  {playerInfo} | {scoring} | {string.Join(" ", statParts)}");
-                        }
-                        else
-                        {
-                            sb.AppendLine($"  {playerInfo} | {scoring}");
-                        }
-                    }
-                }
-                
-                // Blue team goalies
-                if (blueGoalies.Count > 0)
-                {
-                    sb.AppendLine($"{config.blueTeamName} Goalies:");
-                    foreach (var playerData in blueGoalies)
-                    {
-                        // Get passes from Stats mod
-                        int passes = !string.IsNullOrEmpty(playerData.steamId) && playerPasses.ContainsKey(playerData.steamId) ? playerPasses[playerData.steamId] : 0;
-                        
-                        // Get goalie-specific extended stats
-                        int stickSaves = !string.IsNullOrEmpty(playerData.steamId) && playerStickSaves.ContainsKey(playerData.steamId) ? playerStickSaves[playerData.steamId] : 0;
-                        int bodySaves = !string.IsNullOrEmpty(playerData.steamId) && playerBodySaves.ContainsKey(playerData.steamId) ? playerBodySaves[playerData.steamId] : 0;
-                        
-                        // Get saves and save% from goalieSaveStats (same as game summary)
-                        int saves = 0;
-                        int shotsAgainst = 0;
-                        float savePercent = 0f;
-                        if (!string.IsNullOrEmpty(playerData.steamId) && goalieSaveStats.ContainsKey(playerData.steamId))
-                        {
-                            var (savesCount, shots) = goalieSaveStats[playerData.steamId];
-                            saves = savesCount;
-                            shotsAgainst = shots;
-                            savePercent = shots > 0 ? (float)savesCount / (float)shots : 0f;
-                        }
-                        
-                        // Format with Steam ID (DC for disconnected)
-                        string displayPosition = playerData.isDisconnected ? "DC" : "G";
-                        string playerInfo = $"#{playerData.number.ToString().PadLeft(2)} {playerData.name.PadRight(20)} ({displayPosition} ) [{playerData.steamId}]";
-                        
-                        var statParts = new List<string>();
-                        statParts.Add($"{saves}/{shotsAgainst} Saves {savePercent:0.000}");
-                        
-                        // Show stick/body save breakdown if available
-                        if (stickSaves > 0 || bodySaves > 0)
-                        {
-                            statParts.Add($"({stickSaves}Stk/{bodySaves}Bdy)");
-                        }
-                        
-                        if (hasAdvancedStats && passes > 0)
-                        {
-                            statParts.Add($"{passes}Pas");
-                        }
-                        
-                        // Add goals/assists/points if any are non-zero
-                        if (playerData.goals > 0 || playerData.assists > 0)
-                        {
-                            int points = playerData.goals + playerData.assists;
-                            statParts.Add($"{playerData.goals}G {playerData.assists}A {points}P");
-                        }
-                        
-                        sb.AppendLine($"  {playerInfo} | {string.Join(" | ", statParts)}");
-                    }
-                }
-                
-                sb.AppendLine();;
-                
-                // Red team - separate skaters and goalies
-                var redSkaters = allRedPlayers.Where(p => p.role == PlayerRole.Attacker).ToList();
-                var redGoalies = allRedPlayers.Where(p => p.role == PlayerRole.Goalie).ToList();
-                
-                // Red team skaters
-                if (redSkaters.Count > 0)
-                {
-                    sb.AppendLine($"{config.redTeamName} Players:");
-                    foreach (var playerData in redSkaters)
-                    {
-                        int points = playerData.goals + playerData.assists;
-                        float shotPercent = playerData.shots > 0 ? (float)playerData.goals / playerData.shots * 100f : 0f;
-                        
-                        // Get additional stats from Stats mod
-                        int hits = !string.IsNullOrEmpty(playerData.steamId) && playerHits.ContainsKey(playerData.steamId) ? playerHits[playerData.steamId] : 0;
-                        int passes = !string.IsNullOrEmpty(playerData.steamId) && playerPasses.ContainsKey(playerData.steamId) ? playerPasses[playerData.steamId] : 0;
-                        int blocks = !string.IsNullOrEmpty(playerData.steamId) && playerBlocks.ContainsKey(playerData.steamId) ? playerBlocks[playerData.steamId] : 0;
-                        int takeaways = !string.IsNullOrEmpty(playerData.steamId) && playerTakeaways.ContainsKey(playerData.steamId) ? playerTakeaways[playerData.steamId] : 0;
-                        int turnovers = !string.IsNullOrEmpty(playerData.steamId) && playerTurnovers.ContainsKey(playerData.steamId) ? playerTurnovers[playerData.steamId] : 0;
-                        
-                        // Get extended stats
-                        int plusMinus = !string.IsNullOrEmpty(playerData.steamId) && playerPlusMinus.ContainsKey(playerData.steamId) ? playerPlusMinus[playerData.steamId] : 0;
-                        double toi = !string.IsNullOrEmpty(playerData.steamId) && playerTimeOnIce.ContainsKey(playerData.steamId) ? playerTimeOnIce[playerData.steamId] : 0;
-                        int puckBattleWins = !string.IsNullOrEmpty(playerData.steamId) && playerPuckBattleWins.ContainsKey(playerData.steamId) ? playerPuckBattleWins[playerData.steamId] : 0;
-                        int puckBattleLosses = !string.IsNullOrEmpty(playerData.steamId) && playerPuckBattleLosses.ContainsKey(playerData.steamId) ? playerPuckBattleLosses[playerData.steamId] : 0;
-                        
-                        // Format with Steam ID and abbreviated position (DC for disconnected)
-                        string displayPosition = playerData.isDisconnected ? "DC" : playerData.position;
-                        string playerInfo = $"#{playerData.number.ToString().PadLeft(2)} {playerData.name.PadRight(20)} ({displayPosition.PadRight(2)}) [{playerData.steamId}]";
-                        
-                        // Format +/- with sign
-                        string plusMinusStr = plusMinus >= 0 ? $"+{plusMinus}" : plusMinus.ToString();
-                        string scoring = $"{playerData.goals}G {playerData.assists}A {points}P {plusMinusStr} {playerData.shots}S {shotPercent:0.0}%".PadRight(30);
-                        
-                        if (hasAdvancedStats || hasExtendedStats)
-                        {
-                            var statParts = new List<string>();
-                            if (hasAdvancedStats)
-                            {
-                                statParts.Add($"{hits}H {passes}Pas {blocks}Blk {takeaways}TA {turnovers}TO");
-                            }
-                            if (hasExtendedStats && toi > 0)
-                            {
-                                int toiMinutes = (int)(toi / 60);
-                                int toiSeconds = (int)(toi % 60);
-                                statParts.Add($"TOI:{toiMinutes}:{toiSeconds:D2}");
-                            }
-                            if (hasExtendedStats && (puckBattleWins > 0 || puckBattleLosses > 0))
-                            {
-                                statParts.Add($"PB:{puckBattleWins}-{puckBattleLosses}");
-                            }
-                            sb.AppendLine($"  {playerInfo} | {scoring} | {string.Join(" ", statParts)}");
-                        }
-                        else
-                        {
-                            sb.AppendLine($"  {playerInfo} | {scoring}");
-                        }
-                    }
-                }
-                
-                // Red team goalies
-                if (redGoalies.Count > 0)
-                {
-                    sb.AppendLine($"{config.redTeamName} Goalies:");
-                    foreach (var playerData in redGoalies)
-                    {
-                        // Get passes from Stats mod
-                        int passes = !string.IsNullOrEmpty(playerData.steamId) && playerPasses.ContainsKey(playerData.steamId) ? playerPasses[playerData.steamId] : 0;
-                        
-                        // Get goalie-specific extended stats
-                        int stickSaves = !string.IsNullOrEmpty(playerData.steamId) && playerStickSaves.ContainsKey(playerData.steamId) ? playerStickSaves[playerData.steamId] : 0;
-                        int bodySaves = !string.IsNullOrEmpty(playerData.steamId) && playerBodySaves.ContainsKey(playerData.steamId) ? playerBodySaves[playerData.steamId] : 0;
-                        
-                        // Get saves and save% from goalieSaveStats (same as game summary)
-                        int saves = 0;
-                        int shotsAgainst = 0;
-                        float savePercent = 0f;
-                        if (!string.IsNullOrEmpty(playerData.steamId) && goalieSaveStats.ContainsKey(playerData.steamId))
-                        {
-                            var (savesCount, shots) = goalieSaveStats[playerData.steamId];
-                            saves = savesCount;
-                            shotsAgainst = shots;
-                            savePercent = shots > 0 ? (float)savesCount / (float)shots : 0f;
-                        }
-                        
-                        // Format with Steam ID (DC for disconnected)
-                        string displayPosition = playerData.isDisconnected ? "DC" : "G";
-                        string playerInfo = $"#{playerData.number.ToString().PadLeft(2)} {playerData.name.PadRight(20)} ({displayPosition} ) [{playerData.steamId}]";
-                        
-                        var statParts = new List<string>();
-                        statParts.Add($"{saves}/{shotsAgainst} Saves {savePercent:0.000}");
-                        
-                        // Show stick/body save breakdown if available
-                        if (stickSaves > 0 || bodySaves > 0)
-                        {
-                            statParts.Add($"({stickSaves}Stk/{bodySaves}Bdy)");
-                        }
-                        
-                        if (hasAdvancedStats && passes > 0)
-                        {
-                            statParts.Add($"{passes}Pas");
-                        }
-                        
-                        // Add goals/assists/points if any are non-zero
-                        if (playerData.goals > 0 || playerData.assists > 0)
-                        {
-                            int points = playerData.goals + playerData.assists;
-                            statParts.Add($"{playerData.goals}G {playerData.assists}A {points}P");
-                        }
-                        
-                        sb.AppendLine($"  {playerInfo} | {string.Join(" | ", statParts)}");
-                    }
-                }
-            }
-            
-            return sb.ToString();
-        }
-        
-        // ============================================
         // THREE STARS TRACKING METHODS
         // ============================================
         
+        // Extract player name from either a bare name ("PuckistaniSniper") or a chat-formatted
+        // announcement like "The first star is... #67 PuckistaniSniper !" / "1st star: PlayerName".
+        private static string ExtractStarName(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return null;
+
+            string cleanMsg = System.Text.RegularExpressions.Regex.Replace(message, "<.*?>", string.Empty).Trim();
+
+            if (cleanMsg.Contains("is..."))
+            {
+                int isIndex = cleanMsg.IndexOf("is...");
+                return cleanMsg.Substring(isIndex + 5).TrimEnd('!', ' ', '.').Trim();
+            }
+
+            int colonIndex = cleanMsg.IndexOf(':');
+            if (colonIndex >= 0 && colonIndex < cleanMsg.Length - 1)
+            {
+                return cleanMsg.Substring(colonIndex + 1).Trim();
+            }
+
+            // Bare name (e.g. from oomtm450_statsSTAR network handler)
+            return cleanMsg;
+        }
+
         public void OnFirstStarAnnounced(string message)
         {
             try
             {
-                // Parse message like "The first star is... #67 PuckistaniSniper !" or "1st star: PlayerName"
-                string cleanMsg = System.Text.RegularExpressions.Regex.Replace(message, "<.*?>", string.Empty);
-                
-                // Try "is..." format first
-                if (cleanMsg.Contains("is..."))
+                string name = ExtractStarName(message);
+                if (!string.IsNullOrWhiteSpace(name))
                 {
-                    int isIndex = cleanMsg.IndexOf("is...");
-                    string remaining = cleanMsg.Substring(isIndex + 5).Trim();
-                    // Remove trailing exclamation and extra spaces
-                    firstStar = remaining.TrimEnd('!', ' ', '.').Trim();
+                    firstStar = name;
                     DebugLog($"[CustomScoreboard] First star set to: {firstStar}");
-                }
-                // Fallback to colon format
-                else
-                {
-                    int colonIndex = cleanMsg.IndexOf(":");
-                    if (colonIndex >= 0 && colonIndex < cleanMsg.Length - 1)
-                    {
-                        firstStar = cleanMsg.Substring(colonIndex + 1).Trim();
-                        DebugLog($"[CustomScoreboard] First star set to: {firstStar}");
-                    }
                 }
             }
             catch (Exception e)
@@ -454,32 +162,16 @@ namespace CustomScoreboard.UI
                 DebugWarning($"[CustomScoreboard] Error parsing first star: {e}");
             }
         }
-        
+
         public void OnSecondStarAnnounced(string message)
         {
             try
             {
-                // Parse message like "The second star is... #28 DrSouls !" or "2nd star: PlayerName"
-                string cleanMsg = System.Text.RegularExpressions.Regex.Replace(message, "<.*?>", string.Empty);
-                
-                // Try "is..." format first
-                if (cleanMsg.Contains("is..."))
+                string name = ExtractStarName(message);
+                if (!string.IsNullOrWhiteSpace(name))
                 {
-                    int isIndex = cleanMsg.IndexOf("is...");
-                    string remaining = cleanMsg.Substring(isIndex + 5).Trim();
-                    // Remove trailing exclamation and extra spaces
-                    secondStar = remaining.TrimEnd('!', ' ', '.').Trim();
+                    secondStar = name;
                     DebugLog($"[CustomScoreboard] Second star set to: {secondStar}");
-                }
-                // Fallback to colon format
-                else
-                {
-                    int colonIndex = cleanMsg.IndexOf(":");
-                    if (colonIndex >= 0 && colonIndex < cleanMsg.Length - 1)
-                    {
-                        secondStar = cleanMsg.Substring(colonIndex + 1).Trim();
-                        DebugLog($"[CustomScoreboard] Second star set to: {secondStar}");
-                    }
                 }
             }
             catch (Exception e)
@@ -487,32 +179,16 @@ namespace CustomScoreboard.UI
                 DebugWarning($"[CustomScoreboard] Error parsing second star: {e}");
             }
         }
-        
+
         public void OnThirdStarAnnounced(string message)
         {
             try
             {
-                // Parse message like "The third star is... #24 SnackTheWall !" or "3rd star: PlayerName"
-                string cleanMsg = System.Text.RegularExpressions.Regex.Replace(message, "<.*?>", string.Empty);
-                
-                // Try "is..." format first
-                if (cleanMsg.Contains("is..."))
+                string name = ExtractStarName(message);
+                if (!string.IsNullOrWhiteSpace(name))
                 {
-                    int isIndex = cleanMsg.IndexOf("is...");
-                    string remaining = cleanMsg.Substring(isIndex + 5).Trim();
-                    // Remove trailing exclamation and extra spaces
-                    thirdStar = remaining.TrimEnd('!', ' ', '.').Trim();
+                    thirdStar = name;
                     DebugLog($"[CustomScoreboard] Third star set to: {thirdStar}");
-                }
-                // Fallback to colon format
-                else
-                {
-                    int colonIndex = cleanMsg.IndexOf(":");
-                    if (colonIndex >= 0 && colonIndex < cleanMsg.Length - 1)
-                    {
-                        thirdStar = cleanMsg.Substring(colonIndex + 1).Trim();
-                        DebugLog($"[CustomScoreboard] Third star set to: {thirdStar}");
-                    }
                 }
             }
             catch (Exception e)
@@ -632,6 +308,7 @@ namespace CustomScoreboard.UI
             
             // Show the shootout win animation immediately
             DOTween.Sequence()
+                .SetTarget(this)
                 .AppendInterval(1f)
                 .OnComplete(() => {
                     ShowShootoutWinAnimation(winningTeam);

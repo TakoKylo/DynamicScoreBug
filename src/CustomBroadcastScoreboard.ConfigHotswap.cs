@@ -148,18 +148,16 @@ namespace CustomScoreboard.UI
                 Texture2D blueLogoTexture = LoadLogoImage(configToUse.blueTeamLogoFile);
                 Texture2D redLogoTexture = LoadLogoImage(configToUse.redTeamLogoFile);
 
-                // Update league logo (positioned absolutely on root)
+                // League logo: anchored to scoreboardContainer; recompute left from the
+                // league logo section's center so it stays aligned when widths change.
                 if (leagueLogo != null)
                 {
                     leagueLogo.style.width = configToUse.leagueLogoWidth;
                     leagueLogo.style.height = configToUse.leagueLogoHeight;
-                    leagueLogo.style.top = configToUse.scoreboardY;
-                    leagueLogo.style.translate = new StyleTranslate(new Translate(
-                        new Length(configToUse.scoreboardX + 300 + configToUse.leagueLogoOffsetX, LengthUnit.Pixel), 
-                        new Length(configToUse.leagueLogoOffsetY, LengthUnit.Pixel)
-                    ));
-                    leagueLogo.style.scale = new StyleScale(new Scale(new Vector2(configToUse.scoreboardScale, configToUse.scoreboardScale)));
-                    
+                    float sectionCenterX = 280f + (configToUse.leagueLogoSectionWidth / 2f);
+                    leagueLogo.style.left = sectionCenterX - (configToUse.leagueLogoWidth / 2f);
+                    leagueLogo.style.top = (41f - configToUse.leagueLogoHeight) / 2f;
+
                     if (leagueLogoTexture != null)
                     {
                         leagueLogo.style.backgroundImage = new StyleBackground(leagueLogoTexture);
@@ -233,15 +231,14 @@ namespace CustomScoreboard.UI
                     scoreboardContainer.style.scale = new StyleScale(new Scale(new Vector2(configToUse.scoreboardScale, configToUse.scoreboardScale)));
                 }
 
-                // Update league logo position and scale
+                // League logo is a child of scoreboardContainer; its position is anchored
+                // to the league logo section and follows scoreboardContainer's scale
+                // automatically. Left depends on leagueLogoSectionWidth so recompute it.
                 if (leagueLogo != null)
                 {
-                    leagueLogo.style.top = configToUse.scoreboardY;
-                    leagueLogo.style.translate = new StyleTranslate(new Translate(
-                        new Length(configToUse.scoreboardX + 300 + configToUse.leagueLogoOffsetX, LengthUnit.Pixel), 
-                        new Length(configToUse.leagueLogoOffsetY, LengthUnit.Pixel)
-                    ));
-                    leagueLogo.style.scale = new StyleScale(new Scale(new Vector2(configToUse.scoreboardScale, configToUse.scoreboardScale)));
+                    float sectionCenterX = 280f + (configToUse.leagueLogoSectionWidth / 2f);
+                    leagueLogo.style.left = sectionCenterX - (configToUse.leagueLogoWidth / 2f);
+                    leagueLogo.style.top = (41f - configToUse.leagueLogoHeight) / 2f;
                 }
             }
             catch (Exception ex)

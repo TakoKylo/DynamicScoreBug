@@ -141,37 +141,31 @@ namespace CustomScoreboard.UI
             // Time section - split into two sections: black for period, grey for time
             CreateTimeSection(uiFont);
             
-            // Create stat popups
+            // Create stat popups and attach them as children of scoreboardContainer
+            // (so they follow the scorebug's position/scale automatically).
             CreateStatPopups(uiFont);
 
-            // Create goal overlay
-            CreateGoalOverlay(uiFont);
+            // Insert stat popups BEFORE the flex children so they render behind the scorebug
+            // (slide-from-behind look). Index 0 = first child = rendered first = back layer.
+            scoreboardContainer.Insert(0, blueStatPopup);
+            scoreboardContainer.Insert(0, redStatPopup);
 
-            // Scoring summary popup is now created dynamically in ShowScoringSummary()
-            
-            // Create clipping container for popups (without adding popups yet)
-            CreatePopupClipContainer();
-            
-            // Now add the popups to the container
-            DebugLog("[CustomScoreboard] Adding stat popups to popupClipContainer");
-            popupClipContainer.Add(blueStatPopup);
-            popupClipContainer.Add(redStatPopup);
-            DebugLog("[CustomScoreboard] Added stat popups - container now has " + popupClipContainer.childCount + " children");
-            
-            // Add to root
-            DebugLog("[CustomScoreboard] Adding popupClipContainer to root (popupClipContainer=" + (popupClipContainer != null) + ", root=" + (root != null) + ")");
-            root.Add(popupClipContainer); // Add clipping container with popups
-            DebugLog("[CustomScoreboard] Added popupClipContainer to root, parent=" + (popupClipContainer.parent?.name ?? "null") + ", root children=" + root.childCount);
-            root.Add(scoreboardContainer); // Add scoreboard on top
-            DebugLog("[CustomScoreboard] Added scoreboardContainer to root, root children=" + root.childCount);
-            
-            // League logo - positioned absolutely on root, centered over the league logo section
-            AddLeagueLogo(root, leagueLogoTexture);
-            
-            // Create win overlay
+            // Create goal and win overlays. They're children of scoreboardContainer and
+            // added at the END so they render ON TOP of the scorebug's flex children
+            // (covering the scorebug during the animation).
+            CreateGoalOverlay(uiFont);
             CreateWinOverlay(uiFont);
-            
-            root.Add(winOverlay); // Add win overlay on top of everything
+
+            // League logo anchored to the scorebug's league-logo section. Added BEFORE the
+            // goal/win overlays so animations cover it.
+            AddLeagueLogo(root, leagueLogoTexture);
+            scoreboardContainer.Add(leagueLogo);
+
+            scoreboardContainer.Add(goalOverlay);
+            scoreboardContainer.Add(winOverlay);
+
+            root.Add(scoreboardContainer);
+            DebugLog("[CustomScoreboard] Added scoreboardContainer to root, root children=" + root.childCount);
             
             DebugLog("[CustomScoreboard] UI created");
             
@@ -452,7 +446,7 @@ namespace CustomScoreboard.UI
 
         private void CreateLeagueLogoSection()
         {
-            VisualElement leagueLogoSection = new VisualElement();
+            leagueLogoSection = new VisualElement();
             leagueLogoSection.style.width = config.leagueLogoSectionWidth;
             leagueLogoSection.style.height = 40;
             // Apply opacity to league logo section
@@ -476,10 +470,14 @@ namespace CustomScoreboard.UI
         private void CreateTimeSection(UnityEngine.Font uiFont)
         {
             VisualElement timeSection = new VisualElement();
-            timeSection.style.width = 160;
+            // Width matches the sum of children (periodBox + timeBox = 200 by default) so
+            // the section doesn't shrink its kids and the scorebug's total visual width
+            // matches scoreboardContainer.width (780). Otherwise popups end up overhanging.
+            timeSection.style.width = config.periodBoxWidth + config.timeBoxWidth;
             timeSection.style.height = 40;
             timeSection.style.flexDirection = FlexDirection.Row;
             timeSection.style.flexGrow = 0f;
+            timeSection.style.flexShrink = 0f;
             timeSection.pickingMode = PickingMode.Ignore;
 
             // Black box for period
@@ -546,11 +544,16 @@ namespace CustomScoreboard.UI
 
         private void CreateStatPopups(UnityEngine.Font uiFont)
         {
-            // Blue team stat popup
+            // Positioned in scoreboardContainer-local coordinates (anchored to scorebug).
+            // Blue shots area lives at the right of blueSection (x ~= 220-280).
+            // Red shots area lives at the right of redSection (x ~= 520-580).
+            // Stat popups are 80x20 by default; we center them under their team's shots.
             blueStatPopup = new VisualElement();
             blueStatPopup.style.position = Position.Absolute;
             blueStatPopup.style.width = config.statPopupWidth;
             blueStatPopup.style.height = config.statPopupHeight;
+            blueStatPopup.style.left = ScorebugAnchor.BlueStatPopupLeft;
+            blueStatPopup.style.top = 0; // hidden behind scorebug top; ShowStatPopup slides it down
             Color blueStatPopupColor = GetBlueTeamColor();
             blueStatPopupColor.a = 0.95f;
             blueStatPopup.style.backgroundColor = blueStatPopupColor;
@@ -570,11 +573,12 @@ namespace CustomScoreboard.UI
             blueStatLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
             blueStatPopup.Add(blueStatLabel);
 
-            // Red team stat popup
             redStatPopup = new VisualElement();
             redStatPopup.style.position = Position.Absolute;
             redStatPopup.style.width = config.statPopupWidth;
             redStatPopup.style.height = config.statPopupHeight;
+            redStatPopup.style.left = ScorebugAnchor.RedStatPopupLeft;
+            redStatPopup.style.top = 0;
             Color redStatPopupColor = GetRedTeamColor();
             redStatPopupColor.a = 0.95f;
             redStatPopup.style.backgroundColor = redStatPopupColor;
@@ -597,20 +601,19 @@ namespace CustomScoreboard.UI
 
         private void CreateGoalOverlay(UnityEngine.Font uiFont)
         {
+            // Goal overlay is a child of scoreboardContainer (added later, in CreateCustomScoreboard).
+            // Covers the full scorebug; width animates 0 → ScorebugAnchor.Width during the wipe.
             goalOverlay = new VisualElement();
             goalOverlay.style.position = Position.Absolute;
-            goalOverlay.style.width = config.goalOverlayWidth;
-            goalOverlay.style.height = config.goalOverlayHeight;
+            goalOverlay.style.width = 0; // animated by ShowGoalAnimation
+            goalOverlay.style.height = ScorebugAnchor.GoalOverlayHeight;
             goalOverlay.style.alignItems = Align.Center;
             goalOverlay.style.justifyContent = Justify.Center;
             goalOverlay.style.display = DisplayStyle.None;
             goalOverlay.style.overflow = Overflow.Hidden;
-            goalOverlay.style.left = new StyleLength(new Length(50, LengthUnit.Percent));
-            goalOverlay.style.top = config.scoreboardY;
+            goalOverlay.style.left = ScorebugAnchor.GoalOverlayLeft;
+            goalOverlay.style.top = ScorebugAnchor.GoalOverlayTop;
             goalOverlay.pickingMode = PickingMode.Ignore;
-            float goalOverlayHalfWidth = (config.goalOverlayWidth) / 2f;
-            goalOverlay.style.translate = new StyleTranslate(new Translate(new Length(config.scoreboardX - goalOverlayHalfWidth + config.goalOverlayOffsetX, LengthUnit.Pixel), new Length(0, LengthUnit.Pixel)));
-            goalOverlay.style.scale = new StyleScale(new Scale(new Vector2(config.scoreboardScale, config.scoreboardScale)));
             
             goalOverlayLabel = new Label("GOAL!");
             goalOverlayLabel.style.fontSize = 48;
@@ -618,44 +621,30 @@ namespace CustomScoreboard.UI
             goalOverlayLabel.style.color = Color.white;
             goalOverlayLabel.style.unityFont = uiFont;
             goalOverlayLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            goalOverlayLabel.style.width = config.goalOverlayWidth;
-            goalOverlayLabel.style.height = config.goalOverlayHeight;
+            goalOverlayLabel.style.width = ScorebugAnchor.GoalOverlayWidth;
+            goalOverlayLabel.style.height = ScorebugAnchor.GoalOverlayHeight;
             goalOverlayLabel.style.textShadow = new TextShadow { offset = new Vector2(2, 2), blurRadius = 4, color = new Color(0, 0, 0, 0.8f) };
             goalOverlay.Add(goalOverlayLabel);
         }
 
-        private void CreatePopupClipContainer()
-        {
-            DebugLog("[CustomScoreboard] Creating popup clip container");
-            popupClipContainer = new VisualElement();
-            popupClipContainer.name = "PopupClipContainer";
-            popupClipContainer.style.position = Position.Absolute;
-            popupClipContainer.style.top = 0;
-            popupClipContainer.style.left = 0;
-            popupClipContainer.style.width = new StyleLength(new Length(100, LengthUnit.Percent));
-            popupClipContainer.style.height = new StyleLength(new Length(100, LengthUnit.Percent));
-            popupClipContainer.style.overflow = Overflow.Hidden;
-            popupClipContainer.style.display = DisplayStyle.Flex;
-            popupClipContainer.pickingMode = PickingMode.Ignore;
-            
-            // Popups will be added after this method returns
-            DebugLog("[CustomScoreboard] Popup clip container created with " + popupClipContainer.childCount + " children");
-        }
+        // Returns the x position of the center of the league logo section, in scoreboardContainer-local
+        // pixels. Computed from config so it stays stable across scale/translate changes — using the
+        // dynamic layout (GeometryChangedEvent) misfired during transform changes and made the logo
+        // jump positions. blueSection.width is hardcoded to 280 (see CreateBlueSection).
+        private float LeagueLogoSectionCenterX =>
+            280f + (config != null ? config.leagueLogoSectionWidth / 2f : 10f);
 
         private void AddLeagueLogo(VisualElement root, Texture2D leagueLogoTexture)
         {
-            // League logo - positioned absolutely on root, centered over the league logo section
+            // League logo is anchored to scoreboardContainer (sibling of the team sections).
+            // Position is purely a function of config (blueSection width + half of league logo
+            // section width) so it doesn't depend on Unity's resolved-layout system.
             leagueLogo = new VisualElement();
             leagueLogo.style.position = Position.Absolute;
             leagueLogo.style.width = config.leagueLogoWidth;
             leagueLogo.style.height = config.leagueLogoHeight;
-            leagueLogo.style.left = new StyleLength(new Length(50, LengthUnit.Percent));
-            leagueLogo.style.top = config.scoreboardY;
-            leagueLogo.style.translate = new StyleTranslate(new Translate(
-                new Length(config.scoreboardX + 300 + config.leagueLogoOffsetX, LengthUnit.Pixel), 
-                new Length(config.leagueLogoOffsetY, LengthUnit.Pixel)
-            ));
-            leagueLogo.style.scale = new StyleScale(new Scale(new Vector2(config.scoreboardScale, config.scoreboardScale)));
+            leagueLogo.style.left = LeagueLogoSectionCenterX - (config.leagueLogoWidth / 2f);
+            leagueLogo.style.top = (ScorebugAnchor.Height - config.leagueLogoHeight) / 2f;
             leagueLogo.pickingMode = PickingMode.Ignore;
             if (leagueLogoTexture != null)
             {
@@ -665,25 +654,22 @@ namespace CustomScoreboard.UI
             {
                 leagueLogo.style.backgroundColor = new Color(0.3f, 0.3f, 0.3f, 0.3f);
             }
-            root.Add(leagueLogo);
-            root.Add(goalOverlay);
         }
 
         private void CreateWinOverlay(UnityEngine.Font uiFont)
         {
+            // Win overlay is a child of scoreboardContainer. Same anchoring as goal overlay.
             winOverlay = new VisualElement();
             winOverlay.style.position = Position.Absolute;
-            winOverlay.style.width = config.goalOverlayWidth;
-            winOverlay.style.height = config.goalOverlayHeight;
+            winOverlay.style.width = 0; // animated by ShowWinAnimation
+            winOverlay.style.height = ScorebugAnchor.GoalOverlayHeight;
             winOverlay.style.alignItems = Align.Center;
             winOverlay.style.justifyContent = Justify.Center;
             winOverlay.style.overflow = Overflow.Hidden;
             winOverlay.style.display = DisplayStyle.None;
-            winOverlay.style.left = new StyleLength(new Length(50, LengthUnit.Percent));
-            winOverlay.style.top = config.scoreboardY;
+            winOverlay.style.left = ScorebugAnchor.GoalOverlayLeft;
+            winOverlay.style.top = ScorebugAnchor.GoalOverlayTop;
             winOverlay.pickingMode = PickingMode.Ignore;
-            winOverlay.style.translate = new StyleTranslate(new Translate(new Length(config.scoreboardX - ((config.goalOverlayWidth) / 2f) + config.goalOverlayOffsetX, LengthUnit.Pixel), new Length(0, LengthUnit.Pixel)));
-            winOverlay.style.scale = new StyleScale(new Scale(new Vector2(config.scoreboardScale, config.scoreboardScale)));
             
             winOverlayLabel = new Label("");
             winOverlayLabel.style.fontSize = 48;
@@ -691,8 +677,8 @@ namespace CustomScoreboard.UI
             winOverlayLabel.style.color = Color.white;
             winOverlayLabel.style.unityFont = uiFont;
             winOverlayLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
-            winOverlayLabel.style.width = config.goalOverlayWidth;
-            winOverlayLabel.style.height = config.goalOverlayHeight;
+            winOverlayLabel.style.width = ScorebugAnchor.GoalOverlayWidth;
+            winOverlayLabel.style.height = ScorebugAnchor.GoalOverlayHeight;
             winOverlayLabel.style.textShadow = new TextShadow { offset = new Vector2(2, 2), blurRadius = 4, color = new Color(0, 0, 0, 0.8f) };
             winOverlay.Add(winOverlayLabel);
         }

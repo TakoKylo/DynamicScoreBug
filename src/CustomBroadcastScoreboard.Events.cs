@@ -37,6 +37,7 @@ namespace CustomScoreboard.UI
                 
                 // Force a poll of game state to update period display
                 DOTween.Sequence()
+                    .SetTarget(this)
                     .AppendInterval(0.5f)
                     .OnComplete(() => PollGameState());
                 
@@ -84,6 +85,7 @@ namespace CustomScoreboard.UI
                 
                 // Delay scoreboard creation to ensure everything is initialized
                 DOTween.Sequence()
+                    .SetTarget(this)
                     .AppendInterval(0.5f)
                     .OnComplete(() =>
                     {

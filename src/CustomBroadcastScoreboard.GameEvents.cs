@@ -118,6 +118,7 @@ namespace CustomScoreboard.UI
             {
                 // Period just ended - show period summary after a delay
                 DOTween.Sequence()
+                    .SetTarget(this)
                     .AppendInterval(3f) // Wait 3 seconds after period ends
                     .OnComplete(() => ShowPeriodSummary(false)); // false = not end of game
             }
@@ -158,8 +159,9 @@ namespace CustomScoreboard.UI
                 if (winner.HasValue)
                 {
                     hasShownWinAnimation = true;
-                    
+
                     DOTween.Sequence()
+                        .SetTarget(this)
                         .AppendInterval(1f)
                         .OnComplete(() => {
                             // Priority 1: Shootout win (highest priority)
@@ -523,6 +525,7 @@ namespace CustomScoreboard.UI
                         // sends "Goal scored! X KPH from the stick." via UIAnnouncements.
                         // Fall back to a no-speed popup after 3s if the announcement never arrives.
                         DOTween.Sequence()
+                            .SetTarget(this)
                             .AppendInterval(3f)
                             .OnComplete(() => {
                                 // Only show fallback if shot speed popup hasn't already been shown
@@ -536,6 +539,7 @@ namespace CustomScoreboard.UI
                             });
 
                         DOTween.Sequence()
+                            .SetTarget(this)
                             .AppendInterval(15f)
                             .OnComplete(() => ShowScoringSummary(lastGoalMessage));
                     }

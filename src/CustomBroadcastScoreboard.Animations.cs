@@ -87,8 +87,11 @@ namespace CustomScoreboard.UI
                 winOverlayLabel.text = isShutout ? $"{teamName} SHUTOUT WIN!" : $"{teamName} WINS!";
             }
             
-            // Start with width 0 for wipe effect (overlay stays in place)
+            // Start with width 0 for wipe effect (overlay stays in place).
+            // Reset translate in case a previous animation was killed mid-flight.
             winOverlay.style.width = 0;
+            winOverlay.style.translate = new StyleTranslate(new Translate(
+                new Length(0, LengthUnit.Pixel), new Length(0, LengthUnit.Pixel)));
             winOverlay.style.display = DisplayStyle.Flex;
             
             // Reset text position and scale
@@ -101,13 +104,13 @@ namespace CustomScoreboard.UI
                 DOTween.Sequence()
                     .SetTarget(leagueLogo)
                     .Append(DOTween.To(() => 1f, s => {
-                        leagueLogo.style.scale = new StyleScale(new Scale(new Vector2(s * config.scoreboardScale, s * config.scoreboardScale)));
+                        leagueLogo.style.scale = new StyleScale(new Scale(new Vector2(s, s)));
                         leagueLogo.style.opacity = s;
                     }, 0f, 0.3f).SetEase(Ease.InBack))
                     .OnComplete(() => leagueLogo.style.display = DisplayStyle.None);
             }
             
-            float targetWidth = config.goalOverlayWidth;
+            float targetWidth = ScorebugAnchor.GoalOverlayWidth;
             float holdDuration = temporary ? 3.0f : 4.5f; // 2x or 3x the goal hold time
             float rockAngle = 3f; // Rotation angle in degrees
             
@@ -148,21 +151,20 @@ namespace CustomScoreboard.UI
                 winOverlayLabel.style.rotate = new StyleRotate(new Rotate(angle));
             }, 0f, holdDuration * 0.25f).SetEase(Ease.InOutSine));
             
-            // Wipe out left to right
+            // Wipe out left-to-right. Overlay is anchored to scoreboardContainer with
+            // left = GoalOverlayLeft; we shift translate-X by (targetWidth - w) so the right
+            // edge stays fixed while the left edge moves rightward.
             mainSequence.Append(DOTween.To(() => targetWidth, w => {
                 winOverlay.style.width = w;
-                // Move left position to create wipe-away effect
-                float halfWidth = targetWidth / 2f;
                 winOverlay.style.translate = new StyleTranslate(new Translate(
-                    new Length(config.scoreboardX - halfWidth + config.goalOverlayOffsetX + (targetWidth - w), LengthUnit.Pixel), 
+                    new Length(targetWidth - w, LengthUnit.Pixel),
                     new Length(0, LengthUnit.Pixel)));
             }, 0f, 0.6f).SetEase(Ease.InCubic))
             .OnComplete(() => {
-                winOverlay.style.display = DisplayStyle.None;
-                winOverlay.style.width = targetWidth; // Reset
-                    float halfWidth = targetWidth / 2f;
+                    winOverlay.style.display = DisplayStyle.None;
+                    winOverlay.style.width = 0; // ready for next wipe-in
                     winOverlay.style.translate = new StyleTranslate(new Translate(
-                        new Length(config.scoreboardX - halfWidth + config.goalOverlayOffsetX, LengthUnit.Pixel), 
+                        new Length(0, LengthUnit.Pixel),
                         new Length(0, LengthUnit.Pixel)));
                     winOverlayLabel.style.scale = new StyleScale(new Scale(Vector2.one));
                     winOverlayLabel.style.rotate = new StyleRotate(new Rotate(0f));
@@ -173,7 +175,7 @@ namespace CustomScoreboard.UI
                         leagueLogo.style.display = DisplayStyle.Flex;
                         DOTween.Sequence()
                             .Append(DOTween.To(() => 0f, s => {
-                                leagueLogo.style.scale = new StyleScale(new Scale(new Vector2(s * config.scoreboardScale, s * config.scoreboardScale)));
+                                leagueLogo.style.scale = new StyleScale(new Scale(new Vector2(s, s)));
                                 leagueLogo.style.opacity = s;
                             }, 1f, 0.3f).SetEase(Ease.OutBack));
                     }
@@ -240,26 +242,23 @@ namespace CustomScoreboard.UI
             DOTween.Kill(winOverlay);
             DOTween.Kill(winOverlayLabel);
             
-            // Wipe out animation
-            float targetWidth = config.goalOverlayWidth;
-            float halfWidth = targetWidth / 2f;
-            float baseX = config.scoreboardX - halfWidth + config.goalOverlayOffsetX;
-            
+            // Wipe out animation. Anchored coords: shift translate-X by (targetWidth - w)
+            // so the right edge stays fixed while the left edge slides rightward.
+            float targetWidth = ScorebugAnchor.GoalOverlayWidth;
+
             DOTween.Sequence()
                 .SetTarget(winOverlay)
-                // Wipe out left to right (overlay moves during exit)
                 .Append(DOTween.To(() => targetWidth, w => {
                     winOverlay.style.width = w;
                     winOverlay.style.translate = new StyleTranslate(new Translate(
-                        new Length(baseX + (targetWidth - w), LengthUnit.Pixel), 
+                        new Length(targetWidth - w, LengthUnit.Pixel),
                         new Length(0, LengthUnit.Pixel)));
                 }, 0f, 0.6f).SetEase(Ease.InCubic))
                 .OnComplete(() => {
                     winOverlay.style.display = DisplayStyle.None;
-                    // Reset properties
-                    winOverlay.style.width = targetWidth;
+                    winOverlay.style.width = 0;
                     winOverlay.style.translate = new StyleTranslate(new Translate(
-                        new Length(baseX, LengthUnit.Pixel), 
+                        new Length(0, LengthUnit.Pixel),
                         new Length(0, LengthUnit.Pixel)));
                     winOverlayLabel.style.scale = new StyleScale(new Scale(Vector2.one));
                     winOverlayLabel.style.rotate = new StyleRotate(new Rotate(0f));
@@ -271,7 +270,7 @@ namespace CustomScoreboard.UI
                         DOTween.Sequence()
                             .SetTarget(leagueLogo)
                             .Append(DOTween.To(() => 0f, s => {
-                                leagueLogo.style.scale = new StyleScale(new Scale(new Vector2(s * config.scoreboardScale, s * config.scoreboardScale)));
+                                leagueLogo.style.scale = new StyleScale(new Scale(new Vector2(s, s)));
                                 leagueLogo.style.opacity = s;
                             }, 1f, 0.3f).SetEase(Ease.OutBack));
                     }
@@ -355,8 +354,11 @@ namespace CustomScoreboard.UI
             Color textColor = GetTeamTextColor(team);
             goalOverlayLabel.style.color = textColor;
             
-            // Start with width 0 for wipe effect
+            // Start with width 0 for wipe effect. Reset translate so a previously-killed
+            // animation can't leave the overlay shifted.
             goalOverlay.style.width = 0;
+            goalOverlay.style.translate = new StyleTranslate(new Translate(
+                new Length(0, LengthUnit.Pixel), new Length(0, LengthUnit.Pixel)));
             goalOverlay.style.display = DisplayStyle.Flex;
             
             // Animate league logo shrink and disappear
@@ -364,16 +366,20 @@ namespace CustomScoreboard.UI
             {
                 DOTween.Sequence()
                     .Append(DOTween.To(() => 1f, s => {
-                        leagueLogo.style.scale = new StyleScale(new Scale(new Vector2(s * config.scoreboardScale, s * config.scoreboardScale)));
+                        leagueLogo.style.scale = new StyleScale(new Scale(new Vector2(s, s)));
                         leagueLogo.style.opacity = s;
                     }, 0f, 0.3f).SetEase(Ease.InBack))
                     .OnComplete(() => leagueLogo.style.display = DisplayStyle.None);
             }
             
             // Animate: wipe left-to-right, pulse with rotation, rock text back-and-forth, then wipe away
-            float targetWidth = config.goalOverlayWidth;
+            float targetWidth = ScorebugAnchor.GoalOverlayWidth;
             float rockAngle = 3f; // Rotation angle in degrees
-            var mainSequence = DOTween.Sequence();
+            // SetTarget so DOTween.Kill(goalOverlay) in OnDestroy can find this sequence;
+            // OnKill releases the animation lock if the sequence is killed before OnComplete.
+            var mainSequence = DOTween.Sequence()
+                .SetTarget(goalOverlay)
+                .OnKill(() => isAnimationPlaying = false);
             
             // Wipe in from left to right
             mainSequence.Append(DOTween.To(() => 0f, w => {
@@ -407,21 +413,18 @@ namespace CustomScoreboard.UI
                 .Append(DOTween.To(() => -rockAngle, angle => {
                     goalOverlayLabel.style.rotate = new StyleRotate(new Rotate(angle));
                 }, 0f, 0.4f).SetEase(Ease.InOutSine))
-                // Wipe out left to right
+                // Wipe out left-to-right (scoreboard-local; right edge stays fixed via translate)
                 .Append(DOTween.To(() => targetWidth, w => {
                     goalOverlay.style.width = w;
-                    // Move left position to create wipe-away effect
-                    float halfWidth = targetWidth / 2f;
                     goalOverlay.style.translate = new StyleTranslate(new Translate(
-                        new Length(config.scoreboardX - halfWidth + config.goalOverlayOffsetX + (targetWidth - w), LengthUnit.Pixel), 
+                        new Length(targetWidth - w, LengthUnit.Pixel),
                         new Length(0, LengthUnit.Pixel)));
                 }, 0f, 0.6f).SetEase(Ease.InCubic))
                 .OnComplete(() => {
                     goalOverlay.style.display = DisplayStyle.None;
-                    goalOverlay.style.width = targetWidth; // Reset
-                    float halfWidth = targetWidth / 2f;
+                    goalOverlay.style.width = 0;
                     goalOverlay.style.translate = new StyleTranslate(new Translate(
-                        new Length(config.scoreboardX - halfWidth + config.goalOverlayOffsetX, LengthUnit.Pixel), 
+                        new Length(0, LengthUnit.Pixel),
                         new Length(0, LengthUnit.Pixel)));
                     goalOverlayLabel.style.scale = new StyleScale(new Scale(Vector2.one));
                     goalOverlayLabel.style.rotate = new StyleRotate(new Rotate(0f));
@@ -432,7 +435,7 @@ namespace CustomScoreboard.UI
                         leagueLogo.style.display = DisplayStyle.Flex;
                         DOTween.Sequence()
                             .Append(DOTween.To(() => 0f, s => {
-                                leagueLogo.style.scale = new StyleScale(new Scale(new Vector2(s * config.scoreboardScale, s * config.scoreboardScale)));
+                                leagueLogo.style.scale = new StyleScale(new Scale(new Vector2(s, s)));
                                 leagueLogo.style.opacity = s;
                             }, 1f, 0.3f).SetEase(Ease.OutBack));
                     }

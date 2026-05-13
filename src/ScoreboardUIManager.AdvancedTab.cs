@@ -327,135 +327,14 @@ namespace CustomScoreboard.UI
                 if (_scoreboardReference != null) _scoreboardReference.UpdatePositionAndScale(_config);
             }));
 
-            // Popup positioning
-            AddSection(container, "POPUP POSITIONING");
+            // Popup positioning is now automatic — popups are children of the scorebug
+            // and follow its position/scale. Per-popup X/Y/scale offsets and slide-distance
+            // sliders were removed. Width/height sliders remain in POPUP SIZES below.
 
-            UITK.Slider lineupOffsetSlider; UITK.TextField lineupOffsetField;
-            container.Add(MakeSliderRow("LINEUP POPUP OFFSET Y", _config.lineupPopupOffsetY, -1000f, 1000f, out lineupOffsetSlider, out lineupOffsetField, (value) => { _config.lineupPopupOffsetY = value; SaveScoreboardConfig(_config); if (_scoreboardReference != null) _scoreboardReference.ApplyConfigChanges(_config); }));
-
-            UITK.Slider lineupOffsetXSlider; UITK.TextField lineupOffsetXField;
-            container.Add(MakeSliderRow("LINEUP POPUP OFFSET X", _config.lineupPopupOffsetX, -1000f, 1000f, out lineupOffsetXSlider, out lineupOffsetXField, (value) => { _config.lineupPopupOffsetX = value; SaveScoreboardConfig(_config); if (_scoreboardReference != null) _scoreboardReference.ApplyConfigChanges(_config); }));
-
-            UITK.Slider statPopupOffsetYSlider; UITK.TextField statPopupOffsetYField;
-            container.Add(MakeSliderRow("STAT POPUP OFFSET Y", _config.statPopupOffsetY, -1000f, 1000f, out statPopupOffsetYSlider, out statPopupOffsetYField, (value) => { _config.statPopupOffsetY = value; SaveScoreboardConfig(_config); if (_scoreboardReference != null) _scoreboardReference.ApplyConfigChanges(_config); }));
-
-            UITK.Slider bluePopupXSlider; UITK.TextField bluePopupXField;
-            container.Add(MakeSliderRow("BLUE STAT POPUP X", _config.blueStatPopupOffsetX, -1000f, 1000f, out bluePopupXSlider, out bluePopupXField, (value) => { _config.blueStatPopupOffsetX = value; SaveScoreboardConfig(_config); if (_scoreboardReference != null) _scoreboardReference.ApplyConfigChanges(_config); }));
-
-            UITK.Slider redPopupXSlider; UITK.TextField redPopupXField;
-            container.Add(MakeSliderRow("RED STAT POPUP X", _config.redStatPopupOffsetX, -1000f, 1000f, out redPopupXSlider, out redPopupXField, (value) => { _config.redStatPopupOffsetX = value; SaveScoreboardConfig(_config); if (_scoreboardReference != null) _scoreboardReference.ApplyConfigChanges(_config); }));
-
-            UITK.Slider scoringSummaryXSlider; UITK.TextField scoringSummaryXField;
-            container.Add(MakeSliderRow("SCORING SUMMARY X", _config.scoringSummaryX, -1000f, 1000f, out scoringSummaryXSlider, out scoringSummaryXField, (value) => { _config.scoringSummaryX = value; SaveScoreboardConfig(_config); if (_scoreboardReference != null) _scoreboardReference.ApplyConfigChanges(_config); }));
-
-            UITK.Slider scoringSummaryYSlider; UITK.TextField scoringSummaryYField;
-            container.Add(MakeSliderRow("SCORING SUMMARY Y", _config.scoringSummaryY, -1000f, 1000f, out scoringSummaryYSlider, out scoringSummaryYField, (value) => { _config.scoringSummaryY = value; SaveScoreboardConfig(_config); if (_scoreboardReference != null) _scoreboardReference.ApplyConfigChanges(_config); }));
-
-            UITK.Slider scoringSummaryScaleSlider; UITK.TextField scoringSummaryScaleField;
-            container.Add(MakeSliderRow("SCORING SUMMARY SCALE", _config.scoringSummaryScale, 0.1f, 5f, out scoringSummaryScaleSlider, out scoringSummaryScaleField, (value) => { _config.scoringSummaryScale = value; SaveScoreboardConfig(_config); if (_scoreboardReference != null) _scoreboardReference.ApplyConfigChanges(_config); }));
-
-            UITK.Slider periodSummaryXSlider; UITK.TextField periodSummaryXField;
-            container.Add(MakeSliderRow("PERIOD SUMMARY X", _config.periodSummaryX, -1000f, 1000f, out periodSummaryXSlider, out periodSummaryXField, (value) => { _config.periodSummaryX = value; SaveScoreboardConfig(_config); if (_scoreboardReference != null) _scoreboardReference.ApplyConfigChanges(_config); }));
-
-            UITK.Slider periodSummaryYSlider; UITK.TextField periodSummaryYField;
-            container.Add(MakeSliderRow("PERIOD SUMMARY Y", _config.periodSummaryY, -1000f, 1000f, out periodSummaryYSlider, out periodSummaryYField, (value) => { _config.periodSummaryY = value; SaveScoreboardConfig(_config); if (_scoreboardReference != null) _scoreboardReference.ApplyConfigChanges(_config); }));
-
-            UITK.Slider periodSummaryScaleSlider; UITK.TextField periodSummaryScaleField;
-            container.Add(MakeSliderRow("PERIOD SUMMARY SCALE", _config.periodSummaryScale, 0.1f, 5f, out periodSummaryScaleSlider, out periodSummaryScaleField, (value) => { _config.periodSummaryScale = value; SaveScoreboardConfig(_config); if (_scoreboardReference != null) _scoreboardReference.ApplyConfigChanges(_config); }));
-
-            // Popup slide distances
-            AddSection(container, "POPUP SLIDE DISTANCES");
-
-            UITK.Slider statPopupSlideDistSlider; UITK.TextField statPopupSlideDistField;
-            container.Add(MakeSliderRow("STAT POPUP SLIDE DISTANCE", _config.statPopupSlideDistance, -1000f, 1000f, out statPopupSlideDistSlider, out statPopupSlideDistField, (value) => { _config.statPopupSlideDistance = value; SaveScoreboardConfig(_config); if (_scoreboardReference != null) _scoreboardReference.ApplyConfigChanges(_config); }));
-
-            UITK.Slider lineupPopupSlideDistSlider; UITK.TextField lineupPopupSlideDistField;
-            container.Add(MakeSliderRow("LINEUP POPUP SLIDE DISTANCE", _config.lineupPopupSlideDistance, -1000f, 1000f, out lineupPopupSlideDistSlider, out lineupPopupSlideDistField, (value) => { _config.lineupPopupSlideDistance = value; SaveScoreboardConfig(_config); if (_scoreboardReference != null) _scoreboardReference.ApplyConfigChanges(_config); }));
-
-            UITK.Slider scoringSummarySlideDistSlider; UITK.TextField scoringSummarySlideDistField;
-            container.Add(MakeSliderRow("SCORING SUMMARY SLIDE DISTANCE", _config.scoringSummarySlideDistance, -1000f, 1000f, out scoringSummarySlideDistSlider, out scoringSummarySlideDistField, (value) => { _config.scoringSummarySlideDistance = value; SaveScoreboardConfig(_config); if (_scoreboardReference != null) _scoreboardReference.ApplyConfigChanges(_config); }));
-
-            UITK.Slider periodSummarySlideDistSlider; UITK.TextField periodSummarySlideDistField;
-            container.Add(MakeSliderRow("PERIOD SUMMARY SLIDE DISTANCE", _config.periodSummarySlideDistance, -1000f, 1000f, out periodSummarySlideDistSlider, out periodSummarySlideDistField, (value) => { _config.periodSummarySlideDistance = value; SaveScoreboardConfig(_config); if (_scoreboardReference != null) _scoreboardReference.ApplyConfigChanges(_config); }));
-
-            // Popup sizes
-            AddSection(container, "POPUP SIZES");
-
-            UITK.Slider statPopupWidthSlider; UITK.TextField statPopupWidthField;
-            container.Add(MakeSliderRow("STAT POPUP WIDTH", _config.statPopupWidth, -1000f, 1000f, out statPopupWidthSlider, out statPopupWidthField, (value) =>
-            {
-                _config.statPopupWidth = value;
-                SaveScoreboardConfig(_config);
-                if (_scoreboardReference != null) _scoreboardReference.UpdatePositionAndScale();
-            }));
-
-            UITK.Slider statPopupHeightSlider; UITK.TextField statPopupHeightField;
-            container.Add(MakeSliderRow("STAT POPUP HEIGHT", _config.statPopupHeight, -1000f, 1000f, out statPopupHeightSlider, out statPopupHeightField, (value) =>
-            {
-                _config.statPopupHeight = value;
-                SaveScoreboardConfig(_config);
-                if (_scoreboardReference != null) _scoreboardReference.UpdatePositionAndScale();
-            }));
-
-            UITK.Slider lineupPopupWidthSlider; UITK.TextField lineupPopupWidthField;
-            container.Add(MakeSliderRow("LINEUP POPUP WIDTH", _config.lineupPopupWidth, 100f, 1500f, out lineupPopupWidthSlider, out lineupPopupWidthField, (value) => { _config.lineupPopupWidth = value; SaveScoreboardConfig(_config); }));
-
-            UITK.Slider lineupPopupHeightSlider; UITK.TextField lineupPopupHeightField;
-            container.Add(MakeSliderRow("LINEUP POPUP HEIGHT", _config.lineupPopupHeight, -1000f, 1000f, out lineupPopupHeightSlider, out lineupPopupHeightField, (value) => { _config.lineupPopupHeight = value; SaveScoreboardConfig(_config); }));
-
-            UITK.Slider scoringSummaryWidthSlider; UITK.TextField scoringSummaryWidthField;
-            container.Add(MakeSliderRow("SCORING SUMMARY WIDTH", _config.scoringSummaryWidth, -1000f, 1000f, out scoringSummaryWidthSlider, out scoringSummaryWidthField, (value) => { _config.scoringSummaryWidth = value; SaveScoreboardConfig(_config); }));
-
-            UITK.Slider scoringSummaryHeightSlider; UITK.TextField scoringSummaryHeightField;
-            container.Add(MakeSliderRow("SCORING SUMMARY HEIGHT", _config.scoringSummaryHeight, -1000f, 1000f, out scoringSummaryHeightSlider, out scoringSummaryHeightField, (value) => { _config.scoringSummaryHeight = value; SaveScoreboardConfig(_config); }));
-
-            UITK.Slider periodSummaryWidthSlider; UITK.TextField periodSummaryWidthField;
-            container.Add(MakeSliderRow("PERIOD SUMMARY WIDTH", _config.periodSummaryWidth, -1000f, 1000f, out periodSummaryWidthSlider, out periodSummaryWidthField, (value) => { _config.periodSummaryWidth = value; SaveScoreboardConfig(_config); }));
-
-            UITK.Slider periodSummaryHeightSlider; UITK.TextField periodSummaryHeightField;
-            container.Add(MakeSliderRow("PERIOD SUMMARY HEIGHT", _config.periodSummaryHeight, -1000f, 1000f, out periodSummaryHeightSlider, out periodSummaryHeightField, (value) => { _config.periodSummaryHeight = value; SaveScoreboardConfig(_config); }));
-
-            // Game Summary Settings
-            AddSection(container, "GAME SUMMARY SETTINGS");
-
-            UITK.Slider gameSummaryOffsetXSlider; UITK.TextField gameSummaryOffsetXField;
-            container.Add(MakeSliderRow("GAME SUMMARY X OFFSET", _config.gameSummaryOffsetX, -5000f, 5000f, out gameSummaryOffsetXSlider, out gameSummaryOffsetXField, (value) => { _config.gameSummaryOffsetX = value; SaveScoreboardConfig(_config); }));
-
-            UITK.Slider gameSummaryOffsetYSlider; UITK.TextField gameSummaryOffsetYField;
-            container.Add(MakeSliderRow("GAME SUMMARY Y OFFSET", _config.gameSummaryOffsetY, -1000f, 1000f, out gameSummaryOffsetYSlider, out gameSummaryOffsetYField, (value) => { _config.gameSummaryOffsetY = value; SaveScoreboardConfig(_config); }));
-
-            UITK.Slider gameSummarySlideDistSlider; UITK.TextField gameSummarySlideDistField;
-            container.Add(MakeSliderRow("GAME SUMMARY SLIDE DIST", _config.gameSummarySlideDistance, -1000f, 1000f, out gameSummarySlideDistSlider, out gameSummarySlideDistField, (value) => { _config.gameSummarySlideDistance = value; SaveScoreboardConfig(_config); }));
-
-            UITK.Slider gameSummaryWidthSlider; UITK.TextField gameSummaryWidthField;
-            container.Add(MakeSliderRow("GAME SUMMARY WIDTH", _config.gameSummaryWidth, 200f, 1500f, out gameSummaryWidthSlider, out gameSummaryWidthField, (value) => { _config.gameSummaryWidth = value; SaveScoreboardConfig(_config); }));
-
-            // Animation Settings
-            AddSection(container, "ANIMATION SETTINGS (GOALS & WINS)");
-
-            UITK.Slider goalOverlayXSlider; UITK.TextField goalOverlayXField;
-            container.Add(MakeSliderRow("GOAL OVERLAY X OFFSET", _config.goalOverlayOffsetX, -1000f, 1000f, out goalOverlayXSlider, out goalOverlayXField, (value) =>
-            {
-                _config.goalOverlayOffsetX = value;
-                SaveScoreboardConfig(_config);
-                if (_scoreboardReference != null) _scoreboardReference.UpdatePositionAndScale();
-            }));
-
-            UITK.Slider goalOverlayWidthSlider; UITK.TextField goalOverlayWidthField;
-            container.Add(MakeSliderRow("ANIMATION WIDTH", _config.goalOverlayWidth, 100f, 1500f, out goalOverlayWidthSlider, out goalOverlayWidthField, (value) =>
-            {
-                _config.goalOverlayWidth = value;
-                SaveScoreboardConfig(_config);
-                if (_scoreboardReference != null) _scoreboardReference.UpdatePositionAndScale();
-            }));
-
-            UITK.Slider goalOverlayHeightSlider; UITK.TextField goalOverlayHeightField;
-            container.Add(MakeSliderRow("ANIMATION HEIGHT", _config.goalOverlayHeight, 20f, 100f, out goalOverlayHeightSlider, out goalOverlayHeightField, (value) =>
-            {
-                _config.goalOverlayHeight = value;
-                SaveScoreboardConfig(_config);
-                if (_scoreboardReference != null) _scoreboardReference.UpdatePositionAndScale();
-            }));
+            // Popup sizes and goal/win animation dimensions are hardcoded (anchored to
+            // scorebug) — sliders for them were removed. Only the animation team-logo
+            // settings remain since those affect visual style, not anchor math.
+            AddSection(container, "GOAL/WIN ANIMATION LOGO");
 
             UITK.Slider animLogoWidthSlider; UITK.TextField animLogoWidthField;
             container.Add(MakeSliderRow("TEAM LOGO WIDTH", _config.animationLogoWidth, 50f, 500f, out animLogoWidthSlider, out animLogoWidthField, (value) => { _config.animationLogoWidth = value; SaveScoreboardConfig(_config); }));

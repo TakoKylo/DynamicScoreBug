@@ -91,32 +91,25 @@ namespace CustomScoreboard.UI
                     assistText = $"Assist: {assistNames[0]}";
                 }
                 
-                // Create lineup-style popup (half size - 20px tall instead of 40px)
-                VisualElement root = GetRootVisualElement();
-                if (root == null) return;
-                
+                // Anchored to scoreboardContainer so it follows scorebug position/scale.
+                if (scoreboardContainer == null) return;
+
                 VisualElement summaryPopup = new VisualElement();
                 summaryPopup.style.position = Position.Absolute;
-                summaryPopup.style.width = config.scoringSummaryWidth;
+                summaryPopup.style.width = ScorebugAnchor.CenteredPopupWidth;
                 summaryPopup.style.height = config.scoringSummaryHeight;
-                summaryPopup.style.backgroundColor = new Color(0.15f, 0.15f, 0.15f, 0.95f); // Neutral dark color
+                summaryPopup.style.backgroundColor = new Color(0.15f, 0.15f, 0.15f, 0.95f);
                 summaryPopup.style.flexDirection = FlexDirection.Row;
                 summaryPopup.style.justifyContent = Justify.Center;
                 summaryPopup.style.alignItems = Align.Center;
                 summaryPopup.style.paddingLeft = 10;
                 summaryPopup.style.paddingRight = 10;
                 summaryPopup.pickingMode = PickingMode.Ignore;
-                
-                // Position under period/timer (below scoreboard) with config offsets
-                float startY = config.scoreboardY + config.scoringSummaryY;
-                float endY = startY + config.scoringSummarySlideDistance;
-                
+
+                float startY = 0f;
+                float endY = ScorebugAnchor.ScoringSummarySlideTo;
                 summaryPopup.style.top = startY;
-                summaryPopup.style.left = new StyleLength(new Length(50, LengthUnit.Percent));
-                summaryPopup.style.translate = new StyleTranslate(new Translate(
-                    new Length(config.scoreboardX + config.scoringSummaryX - 290f, LengthUnit.Pixel), 
-                    new Length(0, LengthUnit.Pixel)));
-                summaryPopup.style.scale = new StyleScale(new Scale(new Vector2(config.scoreboardScale * config.scoringSummaryScale, config.scoreboardScale * config.scoringSummaryScale)));
+                summaryPopup.style.left = ScorebugAnchor.CenteredPopupLeft;
                 
                 UnityEngine.Font uiFont = GetUIFont();
                 
@@ -128,25 +121,19 @@ namespace CustomScoreboard.UI
                 if (uiFont != null) goalLabel.style.unityFont = uiFont;
                 summaryPopup.Add(goalLabel);
                 
-                // Add to root
-                int scoreboardIndex = root.IndexOf(scoreboardContainer);
-                if (scoreboardIndex >= 0)
-                {
-                    root.Insert(scoreboardIndex, summaryPopup);
-                }
-                else
-                {
-                    root.Add(summaryPopup);
-                }
-                
+                // Insert at index 0 so popup renders behind scorebug (slide-from-behind effect).
+                scoreboardContainer.Insert(0, summaryPopup);
+
                 // Animate: slide down, hold, slide up and remove
                 DOTween.Sequence()
-                    .Append(DOTween.To(() => summaryPopup.style.top.value.value, 
+                    .SetTarget(summaryPopup)
+                    .Append(DOTween.To(() => summaryPopup.style.top.value.value,
                         y => summaryPopup.style.top = y, endY, 0.5f))
                     .AppendInterval(5f)
-                    .Append(DOTween.To(() => summaryPopup.style.top.value.value, 
+                    .Append(DOTween.To(() => summaryPopup.style.top.value.value,
                         y => summaryPopup.style.top = y, startY, 0.5f))
-                    .OnComplete(() => summaryPopup.RemoveFromHierarchy());
+                    .OnComplete(() => { if (summaryPopup.parent != null) summaryPopup.RemoveFromHierarchy(); })
+                    .OnKill(() => { if (summaryPopup.parent != null) summaryPopup.RemoveFromHierarchy(); });
             }
             catch (Exception ex)
             {
@@ -210,27 +197,24 @@ namespace CustomScoreboard.UI
                 var goalLeaders = playerStats.OrderByDescending(p => p.goals).ThenByDescending(p => p.points).Take(3).ToList();
                 var assistLeaders = playerStats.OrderByDescending(p => p.assists).ThenByDescending(p => p.points).Take(3).ToList();
                 
-                // Create lineup-style popup
-                VisualElement root = GetRootVisualElement();
-                if (root == null) return;
-                
-                // Clean up any existing period summary popup and kill its animations
+                // Anchored to scoreboardContainer.
+                if (scoreboardContainer == null) return;
+
                 if (periodSummaryPopup != null)
                 {
-                    DOTween.Kill(periodSummaryPopup); // Kill any ongoing animations
+                    DOTween.Kill(periodSummaryPopup);
                     if (periodSummaryPopup.parent != null)
                     {
                         periodSummaryPopup.RemoveFromHierarchy();
                     }
                 }
-                
-                // Position using config - match lineup popup pattern with offsets for proper scaling
-                float startY = config.scoreboardY;
-                float endY = config.scoreboardY + config.periodSummarySlideDistance;
-                
+
+                float startY = 0f;
+                float endY = ScorebugAnchor.PeriodSummarySlideTo;
+
                 periodSummaryPopup = new VisualElement();
                 periodSummaryPopup.style.position = Position.Absolute;
-                periodSummaryPopup.style.width = config.periodSummaryWidth;
+                periodSummaryPopup.style.width = ScorebugAnchor.CenteredPopupWidth;
                 periodSummaryPopup.style.height = config.periodSummaryHeight;
                 periodSummaryPopup.style.backgroundColor = new Color(0.1f, 0.1f, 0.1f, 0.95f);
                 periodSummaryPopup.style.flexDirection = FlexDirection.Column;
@@ -239,12 +223,8 @@ namespace CustomScoreboard.UI
                 periodSummaryPopup.style.paddingLeft = 8;
                 periodSummaryPopup.style.paddingRight = 8;
                 periodSummaryPopup.style.top = startY;
-                periodSummaryPopup.style.left = new StyleLength(new Length(50, LengthUnit.Percent));
+                periodSummaryPopup.style.left = ScorebugAnchor.CenteredPopupLeft;
                 periodSummaryPopup.pickingMode = PickingMode.Ignore;
-                periodSummaryPopup.style.translate = new StyleTranslate(new Translate(
-                    new Length(config.scoreboardX + config.periodSummaryX - 290f, LengthUnit.Pixel), 
-                    new Length(0, LengthUnit.Pixel)));
-                periodSummaryPopup.style.scale = new StyleScale(new Scale(new Vector2(config.scoreboardScale * config.periodSummaryScale, config.scoreboardScale * config.periodSummaryScale)));
                 
                 UnityEngine.Font uiFont = GetUIFont();
                 
@@ -298,24 +278,16 @@ namespace CustomScoreboard.UI
                     }
                 }
                 
-                // Add to root
-                int scoreboardIndex = root.IndexOf(scoreboardContainer);
-                if (scoreboardIndex >= 0)
-                {
-                    root.Insert(scoreboardIndex, periodSummaryPopup);
-                }
-                else
-                {
-                    root.Add(periodSummaryPopup);
-                }
-                
+                // Insert behind scorebug for slide-from-behind effect.
+                scoreboardContainer.Insert(0, periodSummaryPopup);
+
                 // Animate: slide down, hold 10 seconds, slide up and remove
                 DOTween.Sequence()
                     .SetTarget(periodSummaryPopup) // Set target for proper cleanup
-                    .Append(DOTween.To(() => periodSummaryPopup.style.top.value.value, 
+                    .Append(DOTween.To(() => periodSummaryPopup.style.top.value.value,
                         y => periodSummaryPopup.style.top = y, endY, 0.7f))
                     .AppendInterval(10f)
-                    .Append(DOTween.To(() => periodSummaryPopup.style.top.value.value, 
+                    .Append(DOTween.To(() => periodSummaryPopup.style.top.value.value,
                         y => periodSummaryPopup.style.top = y, startY, 0.7f))
                     .OnComplete(() => {
                         if (periodSummaryPopup != null)

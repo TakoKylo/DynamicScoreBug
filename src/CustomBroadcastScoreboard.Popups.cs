@@ -80,7 +80,7 @@ namespace CustomScoreboard.UI
                                             string text = label.text.Trim();
                                             
                                             // Check if it's a decimal number (contains '.' and is between 0 and 1)
-                                            if (text.Contains(".") && float.TryParse(text, out float savePercent))
+                                            if (text.Contains(".") && float.TryParse(text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float savePercent))
                                             {
                                                 // Save percentages are typically between 0.000 and 1.000
                                                 if (savePercent >= 0f && savePercent <= 1f)
@@ -132,81 +132,42 @@ namespace CustomScoreboard.UI
         {
             try
             {
-                if (config == null || !config.enablePopups) 
+                if (config == null || !config.enablePopups)
                 {
                     DebugWarning("[CustomScoreboard] Popups disabled or config null");
                     return;
                 }
-                
-                if (popupClipContainer == null)
+
+                VisualElement popup = team == PlayerTeam.Blue ? blueStatPopup : redStatPopup;
+                Label label = team == PlayerTeam.Blue ? blueStatLabel : redStatLabel;
+
+                if (popup == null || label == null)
                 {
-                    DebugWarning("[CustomScoreboard] popupClipContainer is NULL!");
+                    DebugWarning($"[CustomScoreboard] Popup or label is null for team {team}");
                     return;
                 }
-                
-                DebugLog("[CustomScoreboard] ShowStatPopup called: team=" + team + ", text=" + text + ", suffix=" + suffix);
-                DebugLog("[CustomScoreboard] Container childCount=" + popupClipContainer.childCount + ", container parent=" + (popupClipContainer.parent?.name ?? "null"));
-            
-            // Select the appropriate popup and label for the team
-            VisualElement popup = team == PlayerTeam.Blue ? blueStatPopup : redStatPopup;
-            Label label = team == PlayerTeam.Blue ? blueStatLabel : redStatLabel;
-            
-            if (popup == null || label == null) 
-            {
-                DebugWarning($"[CustomScoreboard] Popup or label is null for team {team}. popup={popup != null}, label={label != null}");
-                return;
-            }
-            
-            DebugLog("[CustomScoreboard] Found popup and label, popup is in container children=" + popupClipContainer.Contains(popup));
-            DebugLog("[CustomScoreboard] Popup parent name=" + (popup.parent?.name ?? "null") + ", parent is container=" + (popup.parent == popupClipContainer));
-            DebugLog("[CustomScoreboard] Container dimensions - width=" + popupClipContainer.style.width.value.value + "%, height=" + popupClipContainer.style.height.value.value + "%");
-            DebugLog("[CustomScoreboard] Popup size - width=" + popup.style.width.value.value + ", height=" + popup.style.height.value.value);
-            DebugLog("[CustomScoreboard] Popup INITIAL display style=" + popup.style.display.value + ", visible=" + popup.visible);
-            
-            // Update the label text
-            label.text = suffix != "" ? $"{text} {suffix}" : text;
-            
-            // Set background color based on team using config colors
-            Color teamColor = GetTeamColor(team);
-            popup.style.backgroundColor = teamColor;
-            
-            // Set text color based on team using config text colors
-            Color textColor = GetTeamTextColor(team);
-            label.style.color = textColor;
-            
-            // Position directly under the shots section for the team using config
-            float horizontalOffset = team == PlayerTeam.Blue ? 
-                config.scoreboardX + config.blueStatPopupOffsetX : 
-                config.scoreboardX + config.redStatPopupOffsetX;
-            
-            float startY = config.scoreboardY + config.statPopupOffsetY;
-            
-            // Set initial position
-            popup.style.top = startY;
-            popup.style.left = new StyleLength(new Length(50, LengthUnit.Percent));
-            popup.style.translate = new StyleTranslate(new Translate(
-                new Length(horizontalOffset, LengthUnit.Pixel), 
-                new Length(0, LengthUnit.Pixel)
-            ));
-            popup.style.scale = new StyleScale(new Scale(new Vector2(config.scoreboardScale, config.scoreboardScale)));
-            
-            // Show the popup immediately
-            popup.style.display = DisplayStyle.Flex;
-            DebugLog("[CustomScoreboard] Popup AFTER setting to Flex - display=" + popup.style.display.value + ", visible=" + popup.visible + ", positioned at X=" + horizontalOffset + ", Y=" + startY);
-            DebugLog("[CustomScoreboard] Popup will animate from Y=" + startY + " to Y=" + (startY + config.statPopupSlideDistance) + " (distance=" + config.statPopupSlideDistance + ")");
-            
-            // Animate slide down using configurable distance, stay visible, then slide back up
-            DOTween.Sequence()
-                .Append(DOTween.To(() => popup.style.top.value.value, 
-                    y => popup.style.top = y, startY + config.statPopupSlideDistance, 0.3f))
-                .AppendInterval(3f)
-                .Append(DOTween.To(() => popup.style.top.value.value, 
-                    y => popup.style.top = y, startY, 0.9f))
-                .OnComplete(() => 
-                {
-                    popup.style.display = DisplayStyle.None;
-                    DebugLog("[CustomScoreboard] Popup animation complete, display set back to None");
-                });
+
+                // Kill any in-flight animation on this popup so back-to-back calls don't race.
+                DOTween.Kill(popup);
+
+                label.text = suffix != "" ? $"{text} {suffix}" : text;
+                popup.style.backgroundColor = GetTeamColor(team);
+                label.style.color = GetTeamTextColor(team);
+
+                // Reset to hidden-behind-scorebug position. Popup is a child of scoreboardContainer
+                // so left/top are scoreboard-local; it follows the scorebug automatically.
+                popup.style.top = 0;
+                popup.style.display = DisplayStyle.Flex;
+
+                DOTween.Sequence()
+                    .SetTarget(popup)
+                    .Append(DOTween.To(() => popup.style.top.value.value,
+                        y => popup.style.top = y, ScorebugAnchor.StatPopupSlideTo, 0.3f).SetEase(Ease.OutCubic))
+                    .AppendInterval(3f)
+                    .Append(DOTween.To(() => popup.style.top.value.value,
+                        y => popup.style.top = y, 0f, 0.4f).SetEase(Ease.InCubic))
+                    .OnComplete(() => popup.style.display = DisplayStyle.None)
+                    .OnKill(() => popup.style.display = DisplayStyle.None);
             }
             catch (Exception ex)
             {
@@ -253,50 +214,48 @@ namespace CustomScoreboard.UI
                 return;
             }
             
-            // Create lineup popup container spanning full scoreboard width
-            VisualElement root = MonoBehaviourSingleton<UIManager>.Instance.RootVisualElement;
-            if (root == null) return;
-            
+            // Lineup popup is anchored to scoreboardContainer so it follows the scorebug
+            // automatically (no scoreboardX/Y/scale math needed).
+            if (scoreboardContainer == null) return;
+
             VisualElement lineupPopup = new VisualElement();
             lineupPopup.style.position = Position.Absolute;
-            lineupPopup.style.width = config.lineupPopupWidth;
+            lineupPopup.style.width = ScorebugAnchor.CenteredPopupWidth;
             lineupPopup.style.height = config.lineupPopupHeight;
             lineupPopup.style.backgroundColor = new Color(0.1f, 0.1f, 0.1f, 0.95f);
-            lineupPopup.style.flexDirection = FlexDirection.Column;
+            // No horizontal padding: child sections are absolutely positioned in scorebug-local
+            // pixels so they sit exactly under the matching scorebug sections.
             lineupPopup.style.paddingTop = 5;
             lineupPopup.style.paddingBottom = 5;
-            lineupPopup.style.paddingLeft = 10;
-            lineupPopup.style.paddingRight = 10;
             lineupPopup.pickingMode = PickingMode.Ignore;
-            
-            // Position under scoreboard using config
-            float startY = config.scoreboardY;
-            float endY = config.scoreboardY + config.lineupPopupSlideDistance;
-            
+
+            // Anchored to scorebug; top:0 hides behind scorebug initially.
+            float startY = 0f;
+            float endY = ScorebugAnchor.LineupSlideTo;
             lineupPopup.style.top = startY;
-            lineupPopup.style.left = new StyleLength(new Length(50, LengthUnit.Percent));
-            lineupPopup.style.translate = new StyleTranslate(new Translate(
-                new Length(config.scoreboardX + config.lineupPopupOffsetX - 290f, LengthUnit.Pixel), 
-                new Length(0, LengthUnit.Pixel)
-            ));
-            lineupPopup.style.scale = new StyleScale(new Scale(new Vector2(config.scoreboardScale, config.scoreboardScale)));
-            
-            // Get font
+            lineupPopup.style.left = ScorebugAnchor.CenteredPopupLeft;
+
             UnityEngine.Font uiFont = GetUIFont();
-            
-            // Main container row: Blue team (left), Red team (center), Production (right)
-            // Scoreboard proportions: Blue 280px + Logo 20px + Red 280px = 580px, Time 160px = Total 740px
-            // Adjusting to account for borders and padding in the lineup popup
+
+            // Sections are absolutely positioned to align exactly with the scorebug layout:
+            //   blue section:   x=0   to 280  (matches scorebug blue 0-280)
+            //   logo gap:       x=280 to 300  (empty, matches league logo strip)
+            //   red section:    x=300 to 580  (matches scorebug red 300-580)
+            //   production:     x=580 to 780  (matches scorebug period 580-660 + time 660-780)
             VisualElement mainRow = new VisualElement();
-            mainRow.style.flexDirection = FlexDirection.Row;
-            mainRow.style.flexGrow = 1;
-            
-            // Blue team section (left - under blue side of scoreboard)
-            // 280px out of 740px = 37.8%
+            mainRow.style.position = Position.Absolute;
+            mainRow.style.left = 0;
+            mainRow.style.right = 0;
+            mainRow.style.top = 5;
+            mainRow.style.bottom = 5;
+
             VisualElement blueSection = new VisualElement();
+            blueSection.style.position = Position.Absolute;
+            blueSection.style.left = 0;
+            blueSection.style.width = 280;
+            blueSection.style.top = 0;
+            blueSection.style.bottom = 0;
             blueSection.style.flexDirection = FlexDirection.Column;
-            blueSection.style.flexBasis = new StyleLength(new Length(37.5f, LengthUnit.Percent));
-            blueSection.style.flexShrink = 0;
             
             // Blue team name
             Label blueTeamName = new Label(config.blueTeamName);
@@ -313,12 +272,13 @@ namespace CustomScoreboard.UI
             
             mainRow.Add(blueSection);
             
-            // Red team section (center - under red side of scoreboard)
-            // 280px + 20px (logo space) = 300px out of 740px = 40.5%
             VisualElement redSection = new VisualElement();
+            redSection.style.position = Position.Absolute;
+            redSection.style.left = 300;
+            redSection.style.width = 280;
+            redSection.style.top = 0;
+            redSection.style.bottom = 0;
             redSection.style.flexDirection = FlexDirection.Column;
-            redSection.style.flexBasis = new StyleLength(new Length(41, LengthUnit.Percent));
-            redSection.style.flexShrink = 0;
             
             // Red team name
             Label redTeamName = new Label(config.redTeamName);
@@ -335,12 +295,13 @@ namespace CustomScoreboard.UI
             
             mainRow.Add(redSection);
             
-            // Production section (right - under period/time)
-            // 160px out of 740px = 21.6%
             VisualElement productionSection = new VisualElement();
+            productionSection.style.position = Position.Absolute;
+            productionSection.style.left = 580;
+            productionSection.style.width = 200;
+            productionSection.style.top = 0;
+            productionSection.style.bottom = 0;
             productionSection.style.flexDirection = FlexDirection.Column;
-            productionSection.style.flexBasis = new StyleLength(new Length(21.5f, LengthUnit.Percent));
-            productionSection.style.flexShrink = 0;
             productionSection.style.justifyContent = Justify.Center;
             productionSection.style.paddingLeft = 10;
             productionSection.style.borderLeftWidth = 1;
@@ -411,25 +372,22 @@ namespace CustomScoreboard.UI
             mainRow.Add(productionSection);
             lineupPopup.Add(mainRow);
             
-            // Add to root (before scoreboardContainer so it renders underneath)
-            int scoreboardIndex = root.IndexOf(scoreboardContainer);
-            if (scoreboardIndex >= 0)
-            {
-                root.Insert(scoreboardIndex, lineupPopup);
-            }
-            else
-            {
-                root.Add(lineupPopup);
-            }
+            // Insert at index 0 so the popup renders BEHIND the scorebug's flex children,
+            // giving the slide-from-behind look as it animates downward.
+            scoreboardContainer.Insert(0, lineupPopup);
             
-            // Animate slide down, stay visible, then slide back up and remove
+            // Animate slide down, stay visible, then slide back up and remove.
+            // SetTarget+OnKill ensures the popup is removed even if the tween is killed mid-flight
+            // (mod disable, scene change, etc.) — otherwise it would leak in the DOM.
             DOTween.Sequence()
-                .Append(DOTween.To(() => lineupPopup.style.top.value.value, 
+                .SetTarget(lineupPopup)
+                .Append(DOTween.To(() => lineupPopup.style.top.value.value,
                     y => lineupPopup.style.top = y, endY, 0.9f))
                 .AppendInterval(5f) // Show longer for roster
-                .Append(DOTween.To(() => lineupPopup.style.top.value.value, 
+                .Append(DOTween.To(() => lineupPopup.style.top.value.value,
                     y => lineupPopup.style.top = y, startY, 0.9f))
-                .OnComplete(() => lineupPopup.RemoveFromHierarchy());
+                .OnComplete(() => { if (lineupPopup.parent != null) lineupPopup.RemoveFromHierarchy(); })
+                .OnKill(() => { if (lineupPopup.parent != null) lineupPopup.RemoveFromHierarchy(); });
             }
             catch (Exception ex)
             {

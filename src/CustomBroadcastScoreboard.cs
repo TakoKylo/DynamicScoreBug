@@ -15,6 +15,7 @@ namespace CustomScoreboard.UI
     {
         private VisualElement scoreboardContainer;
         private VisualElement leagueLogo;
+        private VisualElement leagueLogoSection;
         private VisualElement blueSection;
         private VisualElement redSection;
         private VisualElement blueTeamLogo;
@@ -34,7 +35,43 @@ namespace CustomScoreboard.UI
         private VisualElement winOverlay; // Win/shutout overlay that persists
         private Label winOverlayLabel;
         private VisualElement periodSummaryPopup; // Separate popup for period summaries
-        private VisualElement popupClipContainer; // Container that clips all popups above scoreboard
+
+        // ScorebugAnchor: positions are scoreboardContainer-local pixel coordinates.
+        // All popups are children of scoreboardContainer so they follow its position/scale
+        // automatically. Layout (scorebug-local x): blue 0-280, logo 280-300, red 300-580,
+        // periodBox 580-660, timeBox 660-780. Total width 780, height 41.
+        private static class ScorebugAnchor
+        {
+            public const float Width = 780f;
+            public const float Height = 41f;
+
+            // Stat popups (80px wide) anchored to the RIGHT edge of each team section.
+            // blueSection ends at x=280; redSection ends at x=580. Popup right edge sits
+            // flush with the section edge under SHOTS column.
+            public const float BlueStatPopupLeft = 200f; // right edge at 280 (blueSection end)
+            public const float RedStatPopupLeft = 500f;  // right edge at 580 (redSection end)
+
+            // Goal/Win overlay covers the full scorebug during the animation.
+            public const float GoalOverlayLeft = 0f;
+            public const float GoalOverlayTop = 0f;
+            public const float GoalOverlayWidth = Width;
+            public const float GoalOverlayHeight = Height;
+
+            // Centered popups span the full scorebug width.
+            public const float CenteredPopupWidth = Width;  // 780
+            public const float CenteredPopupLeft = 0f;
+
+            // Slide distances (final TOP, in scorebug-local pixels). Initial top is always 0
+            // (hidden behind scorebug due to z-order Insert(0)). Final top = Height (41) lands
+            // the popup flush below the scorebug, fully visible.
+            // 40, not 41 — 1px overlap with scorebug bottom eliminates a tiny gap that
+            // appeared during the slide-out animation due to alignItems=Center rounding.
+            public const float StatPopupSlideTo = 40f;
+            public const float LineupSlideTo = 40f;
+            public const float ScoringSummarySlideTo = 40f;
+            public const float PeriodSummarySlideTo = 40f;
+            public const float GameSummarySlideTo = 40f;
+        }
         private Dictionary<ulong, int> playerGoals = new Dictionary<ulong, int>(); // Track goals per player for HAT TRICK
         private Dictionary<ulong, int> playerShots = new Dictionary<ulong, int>(); // Track shots per player for shooting %
         
@@ -60,9 +97,6 @@ namespace CustomScoreboard.UI
         // Cached player stats (so they appear in summary even after leaving) - includes position name
         private Dictionary<ulong, (string name, int number, PlayerTeam team, PlayerRole role, int goals, int assists, int shots, string steamId, string position)> cachedPlayerStats = 
             new Dictionary<ulong, (string, int, PlayerTeam, PlayerRole, int, int, int, string, string)>();
-        
-        // Advanced stats panel
-        private VisualElement advancedStatsPanel = null;
         
         // Last goal information for scoring summary command
         private Dictionary<string, object> lastGoalMessage = null;
@@ -365,7 +399,11 @@ namespace CustomScoreboard.UI
                 }
                 
                 // Kill all DOTween animations on scoreboard elements
+                // DOTween.Kill(this) sweeps any schedule-only sequences (delayed callbacks
+                // for win animations, scoring summaries, polls) that target this MonoBehaviour.
+                DOTween.Kill(this);
                 if (scoreboardContainer != null) DOTween.Kill(scoreboardContainer);
+                if (leagueLogo != null) DOTween.Kill(leagueLogo);
                 if (goalOverlay != null) DOTween.Kill(goalOverlay);
                 if (winOverlay != null) DOTween.Kill(winOverlay);
                 if (winOverlayLabel != null) DOTween.Kill(winOverlayLabel);
@@ -762,7 +800,7 @@ namespace CustomScoreboard.UI
                     phaseText = "FACE-OFF";
                     break;
                 case GamePhase.Replay:
-                    phaseText = "RE    -PLAY";
+                    phaseText = "REPLAY";
                     break;
                 case GamePhase.BlueScore:
                     phaseText = "GOAL";
@@ -938,9 +976,9 @@ namespace CustomScoreboard.UI
         
         // UpdatePlayerShots, UpdateGoalieSaves moved to CustomBroadcastScoreboard.Stats.cs
         
-        // ShowEndOfGameSummary, ShowAdvancedStatsPanel, CreateTeamStatsColumn moved to CustomBroadcastScoreboard.GameSummary.cs
+        // ShowEndOfGameSummary, CreateTeamStatsColumn moved to CustomBroadcastScoreboard.GameSummary.cs
 
-        // OnShootoutAttempt, FormatPlayerStatsSection moved to CustomBroadcastScoreboard.Stats.cs
+        // OnShootoutAttempt moved to CustomBroadcastScoreboard.Stats.cs
 
         // Helper methods moved to CustomBroadcastScoreboard.Helpers.cs
 
