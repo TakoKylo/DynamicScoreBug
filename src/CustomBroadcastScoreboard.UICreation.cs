@@ -100,34 +100,7 @@ namespace CustomScoreboard.UI
             scoreboardContainer.style.display = DisplayStyle.None; // Start hidden until game starts
             scoreboardContainer.pickingMode = PickingMode.Ignore;
 
-            // League logo - create element (will be added to root AFTER scoreboard)
-            leagueLogo = new VisualElement();
-            leagueLogo.style.position = Position.Absolute;
-            leagueLogo.style.width = config.leagueLogoWidth;
-            leagueLogo.style.height = config.leagueLogoHeight;
-            leagueLogo.style.flexShrink = 0; // Prevent logo from shrinking
-            leagueLogo.pickingMode = PickingMode.Ignore; // Allow clicks to pass through
-            leagueLogo.style.display = DisplayStyle.None; // Start hidden until game starts
-            if (leagueLogoTexture != null)
-            {
-                leagueLogo.style.backgroundImage = new StyleBackground(leagueLogoTexture);
-                #pragma warning disable CS0618
-                leagueLogo.style.unityBackgroundScaleMode = ScaleMode.ScaleToFit;
-                #pragma warning restore CS0618
-            }
-            else
-            {
-                leagueLogo.style.backgroundColor = new Color(0.3f, 0.3f, 0.3f, 0.3f); // Semi-transparent fallback
-            }
-            
-            // Position league logo relative to scoreboard position with adjustable offset
-            leagueLogo.style.top = config.scoreboardY + config.leagueLogoOffsetY;
-            leagueLogo.style.left = new StyleLength(new Length(50, LengthUnit.Percent));
-            leagueLogo.style.translate = new StyleTranslate(new Translate(
-                new Length(config.scoreboardX + config.leagueLogoOffsetX, LengthUnit.Pixel), 
-                new Length(0, LengthUnit.Pixel)
-            ));
-            leagueLogo.style.scale = new StyleScale(new Scale(new Vector2(config.scoreboardScale, config.scoreboardScale)));
+            // League logo is created later by AddLeagueLogo() (anchored to scoreboardContainer).
 
             // Create blue section
             CreateBlueSection(uiFont, blueTeamColor, blueLogoTexture);

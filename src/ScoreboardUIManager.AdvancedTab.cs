@@ -198,24 +198,8 @@ namespace CustomScoreboard.UI
                 if (_scoreboardReference != null) _scoreboardReference.HotswapLogos(_config);
             }));
 
-            // Logo positions
+            // Logo positions (league logo is anchored to scorebug now; X/Y sliders removed.)
             AddSection(container, "LOGO POSITIONS");
-
-            UITK.Slider leagueXSlider; UITK.TextField leagueXField;
-            container.Add(MakeSliderRow("LEAGUE LOGO X", _config.leagueLogoOffsetX, -1000f, 1000f, out leagueXSlider, out leagueXField, (value) =>
-            {
-                _config.leagueLogoOffsetX = value;
-                SaveScoreboardConfig(_config);
-                if (_scoreboardReference != null) _scoreboardReference.HotswapLogos(_config);
-            }));
-
-            UITK.Slider leagueYSlider; UITK.TextField leagueYField;
-            container.Add(MakeSliderRow("LEAGUE LOGO Y", _config.leagueLogoOffsetY, -1000f, 1000f, out leagueYSlider, out leagueYField, (value) =>
-            {
-                _config.leagueLogoOffsetY = value;
-                SaveScoreboardConfig(_config);
-                if (_scoreboardReference != null) _scoreboardReference.HotswapLogos(_config);
-            }));
 
             UITK.Slider blueXSlider; UITK.TextField blueXField;
             container.Add(MakeSliderRow("BLUE LOGO X", _config.blueLogoOffsetX, -1000f, 1000f, out blueXSlider, out blueXField, (value) =>
