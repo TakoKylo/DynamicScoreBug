@@ -22,20 +22,26 @@ namespace CustomScoreboard.UI
                 // Get config - create default if needed
                 config = LoadScoreboardConfig();
             
-                // Sync colors to ToasterReskinLoader
-                CustomScoreboard.Integration.ToasterReskinLoaderColorSync.SyncTeamColors(config.blueTeamColorHex, config.redTeamColorHex);
-                
+                // Sync colors to ToasterReskinLoader (skip if the user wants TRL team colors left untouched)
+                if (config.syncTeamColorsToTRL)
+                {
+                    CustomScoreboard.Integration.ToasterReskinLoaderColorSync.SyncTeamColors(config.blueTeamColorHex, config.redTeamColorHex);
+                }
+
                 // Sync minimap colors to ToasterReskinLoader (falls back to team colors if empty)
-                CustomScoreboard.Integration.ToasterReskinLoaderColorSync.SyncMinimapColors(
-                    config.blueMinimapPlayerColorHex, 
-                    config.redMinimapPlayerColorHex,
-                    config.blueMinimapNumberColorHex,
-                    config.redMinimapNumberColorHex,
-                    config.blueTeamColorHex,
-                    config.redTeamColorHex,
-                    config.blueTeamTextColorHex,
-                    config.redTeamTextColorHex
-                );
+                if (config.enableMinimapColors)
+                {
+                    CustomScoreboard.Integration.ToasterReskinLoaderColorSync.SyncMinimapColors(
+                        config.blueMinimapPlayerColorHex,
+                        config.redMinimapPlayerColorHex,
+                        config.blueMinimapNumberColorHex,
+                        config.redMinimapNumberColorHex,
+                        config.blueTeamColorHex,
+                        config.redTeamColorHex,
+                        config.blueTeamTextColorHex,
+                        config.redTeamTextColorHex
+                    );
+                }
                 
                 // Sync team names to ToasterReskinLoader
                 CustomScoreboard.Integration.ToasterReskinLoaderColorSync.SyncTeamNames(config.blueTeamName, config.redTeamName);

@@ -55,7 +55,10 @@ namespace CustomScoreboard.UI
                 preset.minimapPlayerColorHex = ParseStringValue(objJson, "minimapPlayerColorHex");
                 preset.minimapNumberColorHex = ParseStringValue(objJson, "minimapNumberColorHex");
                 // Empty strings are valid - means use team color/text color
-                
+
+                preset.trlPresetName = ParseStringValue(objJson, "trlPresetName");
+                // Empty string is valid - means no linked ToasterReskinLoader preset
+
                 presetList.Add(preset);
                 
                 searchStart = objEnd + 1;
@@ -248,7 +251,8 @@ namespace CustomScoreboard.UI
                     sb.AppendLine($"      \"logoOffsetX\": {preset.logoOffsetX},");
                     sb.AppendLine($"      \"logoOffsetY\": {preset.logoOffsetY},");
                     sb.AppendLine($"      \"minimapPlayerColorHex\": \"{preset.minimapPlayerColorHex ?? ""}\",");
-                    sb.AppendLine($"      \"minimapNumberColorHex\": \"{preset.minimapNumberColorHex ?? ""}\"");
+                    sb.AppendLine($"      \"minimapNumberColorHex\": \"{preset.minimapNumberColorHex ?? ""}\",");
+                    sb.AppendLine($"      \"trlPresetName\": \"{EscapeJson(preset.trlPresetName ?? "")}\"");
                     sb.Append("    }");
                     if (i < teamPresetsToSave.Count - 1) sb.Append(",");
                     sb.AppendLine();

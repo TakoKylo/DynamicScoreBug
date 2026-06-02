@@ -58,12 +58,22 @@ namespace CustomScoreboard.UI
                 SaveScoreboardConfig(_config);
             }));
             
-            container.Add(MakeToggleRow("ENABLE MINIMAP COLORS", _config.enableMinimapColors, (value) => 
+            container.Add(MakeToggleRow("ENABLE MINIMAP COLORS", _config.enableMinimapColors, (value) =>
             {
                 _config.enableMinimapColors = value;
                 SaveScoreboardConfig(_config);
             }));
-            
+
+            // When off, the scorebug uses its own team colors but stops pushing them into ToasterReskinLoader,
+            // so TRL's team/equipment/minimap colors can be controlled independently of the scorebug.
+            container.Add(MakeToggleRow("SYNC TEAM COLORS TO TRL", _config.syncTeamColorsToTRL, (value) =>
+            {
+                _config.syncTeamColorsToTRL = value;
+                SaveScoreboardConfig(_config);
+                // Re-apply so enabling it pushes colors to TRL immediately.
+                if (_scoreboardReference != null) _scoreboardReference.ApplyConfigChanges(_config);
+            }));
+
             container.Add(MakeToggleRow("ENABLE DEBUG LOGS", _config.enableDebugLogs, (value) => 
             {
                 _config.enableDebugLogs = value;

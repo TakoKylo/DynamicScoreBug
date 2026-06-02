@@ -149,6 +149,7 @@ namespace CustomScoreboard
         public float logoOffsetY = -37f;
         public string minimapPlayerColorHex = ""; // If empty, uses teamColorHex
         public string minimapNumberColorHex = ""; // If empty, uses teamTextColorHex
+        public string trlPresetName = ""; // Optional: name of a ToasterReskinLoader preset to apply (to this side) when this team preset is applied. Empty = don't touch TRL.
     }
 
     [Serializable]
@@ -250,6 +251,7 @@ namespace CustomScoreboard
         public bool enableAnimations = true; // Controls all popups and animations (goal, win, stat popups, etc)
         public bool enablePopups = true; // Controls all popup overlays (goal, game summary, etc)
         public bool enableMinimapColors = true; // Enable/disable custom minimap colors
+        public bool syncTeamColorsToTRL = true; // If true, push team colors into ToasterReskinLoader (equipment + minimap player icons). If false, the scorebug keeps using its own team colors but leaves TRL's team colors untouched, so TRL/minimap colors can be controlled independently.
         public bool enableCompactLayout = false; // Compact layout: teams stacked vertically, period/time on right, league logo on left
         public float scoreboardX = -350f;
         public float scoreboardY = 40f;

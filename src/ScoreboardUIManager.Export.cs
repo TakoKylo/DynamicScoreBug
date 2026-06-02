@@ -110,7 +110,8 @@ namespace CustomScoreboard.UI
                             logoWidth = preset.logoWidth,
                             logoHeight = preset.logoHeight,
                             logoOffsetX = preset.logoOffsetX,
-                            logoOffsetY = preset.logoOffsetY
+                            logoOffsetY = preset.logoOffsetY,
+                            trlPresetName = preset.trlPresetName
                         });
                         
                         // Track logo file for copying

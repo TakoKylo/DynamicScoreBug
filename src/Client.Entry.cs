@@ -92,7 +92,21 @@ public sealed partial class Scoreboard_ClientMod : global::IPuckPlugin
             PonceMods.Shared.ModMenuHub.Cleanup("Scoreboard");
         }
         catch { }
-        
+
+        // Unregister stats network handlers so they don't fire against a destroyed scoreboard
+        // after the mod is disabled (they capture the scoreboard instance).
+        try
+        {
+            var messagingManager = Unity.Netcode.NetworkManager.Singleton?.CustomMessagingManager;
+            if (messagingManager != null)
+            {
+                messagingManager.UnregisterNamedMessageHandler("oomtm450_statsSTAR");
+                messagingManager.UnregisterNamedMessageHandler("oomtm450_statsBATCHSOG");
+                messagingManager.UnregisterNamedMessageHandler("oomtm450_statsBATCHSAVEPERC");
+            }
+        }
+        catch { }
+
         try { _harmony?.UnpatchSelf(); } catch { }
         try { if (_host != null) UnityEngine.Object.Destroy(_host); } catch { }
         _harmony = null;
@@ -231,11 +245,10 @@ public sealed partial class Scoreboard_ClientMod : global::IPuckPlugin
                         Debug.Log($"[Scoreboard] Star data received: {data}");
                         
                         var parts = data.Split(';');
-                        if (parts.Length >= 2)
+                        if (parts.Length >= 2 && int.TryParse(parts[1], out int starNumber))
                         {
                             string steamId = parts[0];
-                            int starNumber = int.Parse(parts[1]);
-                            
+
                             // Get player name from Steam ID
                             var playerManager = MonoBehaviourSingleton<PlayerManager>.Instance;
                             if (playerManager != null)

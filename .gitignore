@@ -17,6 +17,9 @@ ToasterReskinLoader_Decompiled/
 .vscode/
 *.swp
 
+# Claude Code local settings
+.claude/
+
 # OS
 Thumbs.db
 .DS_Store

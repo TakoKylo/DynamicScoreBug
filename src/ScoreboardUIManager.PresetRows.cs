@@ -9,16 +9,25 @@ namespace CustomScoreboard.UI
 {
     public partial class ScoreboardUIManager
     {
+        // Display string for "no linked TRL preset" in the per-row selector.
+        private const string NoTrlPresetLabel = "(none)";
+
+        // Names of TRL presets, refreshed each time the preset rows are (re)built.
+        private List<string> _trlPresetNames = new List<string>();
+
         private void RefreshPresetRows()
         {
             _presetRows.Clear();
             _presetRowsRoot?.Clear();
-            
+
             // Ensure presets are loaded
             if (_presetsConfig == null)
             {
                 _presetsConfig = LoadPresetsConfig();
             }
+
+            // Cache the list of TRL presets once per rebuild (each call reads from disk).
+            _trlPresetNames = Integration.ToasterReskinLoaderPresetSync.GetPresetNames();
             
             // Group presets by pack name
             var groupedPresets = new Dictionary<string, List<(TeamPreset preset, int index)>>();
@@ -223,7 +232,43 @@ namespace CustomScoreboard.UI
             removeBtn.style.marginRight = 8;
             styleButton(removeBtn);
             row.Add(removeBtn);
-            
+
+            // Optional link to a ToasterReskinLoader preset. The selector only appears when TRL's
+            // preset system is installed (or this preset already has a saved link, so it isn't lost).
+            // When set, applying this team preset to a side also applies the chosen TRL preset to it.
+            string storedTrl = preset.trlPresetName ?? "";
+            if (Integration.ToasterReskinLoaderPresetSync.IsPresetSystemAvailable || !string.IsNullOrEmpty(storedTrl))
+            {
+                var trlLabel = new UITK.Label("TRL");
+                MakeReadable(trlLabel);
+                trlLabel.style.fontSize = 16;
+                trlLabel.style.marginRight = 4;
+                row.Add(trlLabel);
+
+                var trlChoices = new List<string> { NoTrlPresetLabel };
+                trlChoices.AddRange(_trlPresetNames);
+                // Keep an orphaned saved value selectable so it isn't silently dropped (e.g. TRL not loaded yet).
+                if (!string.IsNullOrEmpty(storedTrl) && !trlChoices.Contains(storedTrl))
+                    trlChoices.Add(storedTrl);
+
+                var trlDropdown = new UITK.DropdownField { choices = trlChoices };
+                trlDropdown.value = string.IsNullOrEmpty(storedTrl) ? NoTrlPresetLabel : storedTrl;
+                trlDropdown.style.width = 150;
+                trlDropdown.style.height = 30;
+                trlDropdown.style.marginRight = 8;
+                StyleDropdown(trlDropdown);
+                trlDropdown.RegisterValueChangedCallback(evt =>
+                {
+                    if (index < _presetsConfig.teamPresets.Count)
+                    {
+                        _presetsConfig.teamPresets[index].trlPresetName =
+                            evt.newValue == NoTrlPresetLabel ? "" : evt.newValue;
+                        SavePresetsConfig(_presetsConfig);
+                    }
+                });
+                row.Add(trlDropdown);
+            }
+
             // Add BOTH apply buttons for all presets (can apply any preset to either side)
             // Apply to Blue button
             var applyBlueBtn = new UITK.Button(() =>
@@ -243,7 +288,10 @@ namespace CustomScoreboard.UI
                 _config.blueMinimapNumberColorHex = preset.minimapNumberColorHex;
                 SaveScoreboardConfig(_config);
                 if (_scoreboardReference != null) _scoreboardReference.RefreshScoreboardUI();
-                
+
+                // Apply the linked ToasterReskinLoader preset to the same (blue/left) side, if any.
+                Integration.ToasterReskinLoaderPresetSync.ApplyPresetByName(preset.trlPresetName, true);
+
                 // Refresh the UI panel to show new config values
                 RefreshUI();
             });
@@ -272,7 +320,10 @@ namespace CustomScoreboard.UI
                 _config.redMinimapNumberColorHex = preset.minimapNumberColorHex;
                 SaveScoreboardConfig(_config);
                 if (_scoreboardReference != null) _scoreboardReference.RefreshScoreboardUI();
-                
+
+                // Apply the linked ToasterReskinLoader preset to the same (red/right) side, if any.
+                Integration.ToasterReskinLoaderPresetSync.ApplyPresetByName(preset.trlPresetName, false);
+
                 // Refresh the UI panel to show new config values
                 RefreshUI();
             });

@@ -75,23 +75,29 @@ namespace CustomScoreboard.UI
                 // Update internal config reference directly
                 config = newConfig;
                 
-                // Sync colors to ToasterReskinLoader
-                Integration.ToasterReskinLoaderColorSync.SyncTeamColors(newConfig.blueTeamColorHex, newConfig.redTeamColorHex);
-                
+                // Sync colors to ToasterReskinLoader (skip if the user wants TRL team colors left untouched)
+                if (newConfig.syncTeamColorsToTRL)
+                {
+                    Integration.ToasterReskinLoaderColorSync.SyncTeamColors(newConfig.blueTeamColorHex, newConfig.redTeamColorHex);
+                }
+
                 // Sync team names to ToasterReskinLoader
                 Integration.ToasterReskinLoaderColorSync.SyncTeamNames(newConfig.blueTeamName, newConfig.redTeamName);
-                
+
                 // Sync minimap colors to ToasterReskinLoader (falls back to team colors if empty)
-                Integration.ToasterReskinLoaderColorSync.SyncMinimapColors(
-                    newConfig.blueMinimapPlayerColorHex,
-                    newConfig.redMinimapPlayerColorHex,
-                    newConfig.blueMinimapNumberColorHex,
-                    newConfig.redMinimapNumberColorHex,
-                    newConfig.blueTeamColorHex,
-                    newConfig.redTeamColorHex,
-                    newConfig.blueTeamTextColorHex,
-                    newConfig.redTeamTextColorHex
-                );
+                if (newConfig.enableMinimapColors)
+                {
+                    Integration.ToasterReskinLoaderColorSync.SyncMinimapColors(
+                        newConfig.blueMinimapPlayerColorHex,
+                        newConfig.redMinimapPlayerColorHex,
+                        newConfig.blueMinimapNumberColorHex,
+                        newConfig.redMinimapNumberColorHex,
+                        newConfig.blueTeamColorHex,
+                        newConfig.redTeamColorHex,
+                        newConfig.blueTeamTextColorHex,
+                        newConfig.redTeamTextColorHex
+                    );
+                }
                 
                 // Hotswap logos without recreating UI
                 HotswapLogos(newConfig);
