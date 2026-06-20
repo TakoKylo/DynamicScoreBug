@@ -51,6 +51,11 @@ namespace CustomScoreboard.UI
         private UITK.VisualElement _teamPresetsContainer;
         private UITK.VisualElement _sizePresetsContainer;
 
+        // Search/filter: a persistent box above the scroll view that hides rows on
+        // the active tab whose label does not contain the query (matches CompAdjust).
+        private UITK.TextField _searchField;
+        private string _searchQuery = "";
+
         // PoncePlayerInput styling constants for better readability
         private static readonly Color32 TextFieldBg = new Color32(57, 57, 57, 255);
         private static readonly Color32 RowBg = new Color32(61, 61, 61, 255);
@@ -138,14 +143,19 @@ namespace CustomScoreboard.UI
             s.style.marginLeft = 6;
             s.style.marginRight = 6;
 
-            // Try both legacy and new class names
-            var tracker = s.Q<VisualElement>(className: "unity-tracker") ?? s.Q<VisualElement>(className: "unity-slider__tracker");
-            var dragger = s.Q<VisualElement>(className: "unity-dragger") ?? s.Q<VisualElement>(className: "unity-slider__dragger");
+            // Cover legacy, current, and base-slider USS class names - Unity
+            // renames these between versions and only one will match per build.
+            var tracker = s.Q<VisualElement>(className: "unity-base-slider__tracker")
+                       ?? s.Q<VisualElement>(className: "unity-slider__tracker")
+                       ?? s.Q<VisualElement>(className: "unity-tracker");
+            var dragger = s.Q<VisualElement>(className: "unity-base-slider__dragger")
+                       ?? s.Q<VisualElement>(className: "unity-slider__dragger")
+                       ?? s.Q<VisualElement>(className: "unity-dragger");
             if (tracker != null)
             {
                 tracker.style.height = 4;
                 tracker.style.marginTop = 11; // vertically center the 4px rail in 26px
-                tracker.style.backgroundColor = new StyleColor(new Color(1, 1, 1, 0.15f));
+                tracker.style.backgroundColor = new StyleColor(new Color(1f, 1f, 1f, 0.35f));
                 tracker.style.borderTopLeftRadius = 2;
                 tracker.style.borderTopRightRadius = 2;
                 tracker.style.borderBottomLeftRadius = 2;
@@ -627,13 +637,13 @@ namespace CustomScoreboard.UI
                 MakeReadable(title);
                 title.style.fontSize = 50;
                 title.style.unityTextAlign = TextAnchor.MiddleLeft;
-                title.style.marginBottom = 8;
+                title.style.marginBottom = 16;
                 _configPanel.Add(title);
 
                 // Tab bar
                 var tabBar = new VisualElement();
                 tabBar.style.flexDirection = FlexDirection.Row;
-                tabBar.style.marginBottom = 26;
+                tabBar.style.marginBottom = 8;
                 tabBar.style.height = 50;
 
                 _tabGeneral = MakeTabButton("GENERAL", true, () => SwitchToTab(ScoreboardTab.General));
@@ -645,11 +655,56 @@ namespace CustomScoreboard.UI
                 tabBar.Add(_tabPresets);
                 tabBar.Add(_tabAdvanced);
                 tabBar.Add(_tabTests);
+                // MakeTabButton gives every tab an 8px right margin for spacing; the
+                // last tab must not, or it sits 8px off the right edge while the
+                // first tab hugs the left. Zero it so both ends are flush.
+                _tabTests.style.marginRight = 0;
                 _configPanel.Add(tabBar);
+
+                // Search box: filters the rows on the active tab by label text. It
+                // sits above the scroll view so it stays put while the list scrolls.
+                // Styled as a row (RowBg + 12px inset) so SEARCH lines up with the
+                // row labels below it instead of sitting flush against the panel edge.
+                var searchRow = new VisualElement();
+                searchRow.style.flexDirection = FlexDirection.Row;
+                searchRow.style.alignItems = Align.Center;
+                searchRow.style.flexShrink = 0;
+                searchRow.style.height = 50;
+                searchRow.style.marginBottom = 8;
+                searchRow.style.paddingLeft = 12;
+                searchRow.style.paddingRight = 12;
+                searchRow.style.backgroundColor = new StyleColor(RowBg);
+
+                var searchLabel = new Label("SEARCH");
+                searchLabel.style.fontSize = 18;
+                searchLabel.style.marginRight = 8;
+                MakeReadable(searchLabel);
+                searchRow.Add(searchLabel);
+
+                _searchField = new TextField();
+                _searchField.value = _searchQuery;
+                _searchField.style.flexGrow = 1;
+                _searchField.style.height = 34;
+                _searchField.style.backgroundColor = new StyleColor(TextFieldBg);
+                _searchField.style.color = Color.white;
+                ForceUIFont(_searchField);
+                _searchField.RegisterValueChangedCallback(e =>
+                {
+                    _searchQuery = e.newValue ?? "";
+                    ApplySearchFilter();
+                });
+                searchRow.Add(_searchField);
+                _configPanel.Add(searchRow);
 
                 // Create scrollable content
                 _mainScrollView = new ScrollView();
                 _mainScrollView.style.flexGrow = 1;
+                // A flex item's default min-height is its content size, so a long
+                // list keeps the scroll view tall and pushes the footer past the
+                // panel's clipped bottom. Pin min-height to 0 so the scroll view
+                // shrinks and the footer stays in (matches CompAdjust).
+                _mainScrollView.style.flexShrink = 1;
+                _mainScrollView.style.minHeight = 0;
                 _mainScrollView.verticalScrollerVisibility = ScrollerVisibility.Auto;
                 _mainScrollView.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
                 _configPanel.Add(_mainScrollView);
@@ -674,40 +729,33 @@ namespace CustomScoreboard.UI
                 // Show initial tab
                 SwitchToTab(ScoreboardTab.General);
 
-                // Button row at bottom - hardcoded like other mods
-                var buttonRow = new VisualElement();
-                buttonRow.style.flexDirection = FlexDirection.Row;
-                buttonRow.style.marginTop = 8;
-
-                // Donate button (left)
+                // Button row at bottom (CompAdjust layout): COFFEE? alone on the
+                // left; EXPORT + CLOSE grouped together on the right. No bottom
+                // margins on the buttons - the gap under the row comes from the
+                // panel's bottom padding.
                 var donateBtn = new Button(() => Application.OpenURL("https://buymeacoffee.com/amikiir")) { text = "COFFEE?" };
                 styleBottomButton(donateBtn);
-                donateBtn.style.unityTextAlign = new UITK.StyleEnum<TextAnchor>(TextAnchor.MiddleCenter);
-                donateBtn.style.whiteSpace = WhiteSpace.NoWrap;
-                donateBtn.style.fontSize = 24;
-                donateBtn.style.marginBottom = 8;
-                buttonRow.Add(donateBtn);
 
-                // Export button (middle, hardcoded margin)
                 var exportBtn = new Button(() => ShowExportPackDialog()) { text = "EXPORT FOR WORKSHOP" };
                 styleBottomButton(exportBtn);
-                exportBtn.style.unityTextAlign = new UITK.StyleEnum<TextAnchor>(TextAnchor.MiddleCenter);
-                exportBtn.style.whiteSpace = WhiteSpace.NoWrap;
-                exportBtn.style.fontSize = 24;
-                exportBtn.style.marginBottom = 22;
-                exportBtn.style.marginLeft = 238;
-                buttonRow.Add(exportBtn);
+                exportBtn.style.marginLeft = 8;
 
-                // Close button (just closes - saving happens on every change now)
                 var closeButton = new Button(() => HideUI()) { text = "CLOSE" };
                 styleBottomButton(closeButton);
-                closeButton.style.unityTextAlign = new UITK.StyleEnum<TextAnchor>(TextAnchor.MiddleCenter);
-                closeButton.style.whiteSpace = WhiteSpace.NoWrap;
-                closeButton.style.fontSize = 24;
-                closeButton.style.marginBottom = 22;
                 closeButton.style.marginLeft = 8;
                 closeButton.style.paddingRight = 182;
-                buttonRow.Add(closeButton);
+
+                var buttonRow = new VisualElement();
+                buttonRow.style.flexDirection = FlexDirection.Row;
+                buttonRow.style.justifyContent = Justify.SpaceBetween;
+                buttonRow.style.marginTop = 8;
+                buttonRow.style.flexShrink = 0;   // footer keeps its size; the list shrinks instead
+                buttonRow.Add(donateBtn);
+                var rightButtons = new VisualElement();
+                rightButtons.style.flexDirection = FlexDirection.Row;
+                rightButtons.Add(exportBtn);
+                rightButtons.Add(closeButton);
+                buttonRow.Add(rightButtons);
 
                 _configPanel.Add(buttonRow);
 
@@ -735,7 +783,10 @@ namespace CustomScoreboard.UI
             btn.style.paddingLeft = 8;
             btn.style.paddingRight = 8;
             btn.style.marginRight = 8;
-            btn.style.marginBottom = 26;
+            // Spacing below the tab strip is owned by tabBar.marginBottom; the
+            // button keeps no bottom margin of its own (it used to stack a second
+            // gap and bleed past the strip into the search row).
+            btn.style.marginBottom = 0;
             btn.style.fontSize = 24;
             btn.style.unityTextAlign = new StyleEnum<TextAnchor>(TextAnchor.MiddleCenter);
             btn.style.borderTopLeftRadius = 6;
@@ -778,6 +829,11 @@ namespace CustomScoreboard.UI
             if (_presetsContent != null) _presetsContent.style.display = (tab == ScoreboardTab.Presets) ? DisplayStyle.Flex : DisplayStyle.None;
             if (_advancedContent != null) _advancedContent.style.display = (tab == ScoreboardTab.Advanced) ? DisplayStyle.Flex : DisplayStyle.None;
             if (_testsContent != null) _testsContent.style.display = (tab == ScoreboardTab.Tests) ? DisplayStyle.Flex : DisplayStyle.None;
+
+            // Re-apply the active search query to the newly-shown tab's rows.
+            // (ActiveTabContainer / MarkSearchable / ApplySearchFilter live in
+            // ScoreboardUIManager.Search.cs.)
+            ApplySearchFilter();
         }
 
         private void UpdateTabStyles()

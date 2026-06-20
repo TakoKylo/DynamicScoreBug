@@ -1,4 +1,5 @@
 using System;
+using System.Text.RegularExpressions;
 using UnityEngine;
 using UnityEngine.UIElements;
 using UITK = UnityEngine.UIElements;
@@ -7,126 +8,78 @@ namespace CustomScoreboard.UI
 {
     public partial class ScoreboardUIManager
     {
-        private void FilterUIElements(string searchText)
+        // SEARCH box support (matches Competitive Adjustments). Rows built by the
+        // Make*Row helpers tag themselves via MarkSearchable; ApplySearchFilter
+        // shows/hides them on the active tab as the query changes.
+
+        // Returns the content container for the active tab, so the search filter
+        // only touches the rows the user is currently looking at.
+        private UITK.VisualElement ActiveTabContainer()
         {
-            try
+            switch (_activeTab)
             {
-                if (_mainScrollView == null || _mainScrollView.contentContainer == null)
-                    return;
-
-                // If search is empty, show everything
-                if (string.IsNullOrWhiteSpace(searchText))
-                {
-                    ShowAllElements(_mainScrollView.contentContainer);
-                    return;
-                }
-
-                searchText = searchText.ToLower();
-
-                // Go through each top-level child
-                foreach (var child in _mainScrollView.contentContainer.Children())
-                {
-                    bool isSection = child.ClassListContains("section");
-
-                    if (isSection)
-                    {
-                        // This is a section - check its rows individually
-                        bool hasVisibleRows = false;
-                        bool isFirstChild = true;
-
-                        foreach (var sectionChild in child.Children())
-                        {
-                            // First child in a section is usually the section label - always show it
-                            if (isFirstChild)
-                            {
-                                sectionChild.style.display = DisplayStyle.Flex;
-                                isFirstChild = false;
-                                continue;
-                            }
-
-                            // For all other children (the actual setting rows), check if they match
-                            bool rowMatches = RowContainsSearchText(sectionChild, searchText);
-                            sectionChild.style.display = rowMatches ? DisplayStyle.Flex : DisplayStyle.None;
-
-                            if (rowMatches)
-                                hasVisibleRows = true;
-                        }
-
-                        // Hide entire section if no rows matched
-                        child.style.display = hasVisibleRows ? DisplayStyle.Flex : DisplayStyle.None;
-                    }
-                    else
-                    {
-                        // Not a section, just a standalone row
-                        bool matches = RowContainsSearchText(child, searchText);
-                        child.style.display = matches ? DisplayStyle.Flex : DisplayStyle.None;
-                    }
-                }
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogWarning("[Scoreboard] Error filtering UI: " + ex.Message);
+                case ScoreboardTab.General: return _generalContent;
+                case ScoreboardTab.Presets: return _presetsContent;
+                case ScoreboardTab.Advanced: return _advancedContent;
+                case ScoreboardTab.Tests: return _testsContent;
+                default: return null;
             }
         }
 
-        private bool RowContainsSearchText(VisualElement row, string searchText)
+        // Tags a row so the SEARCH box can show/hide it by its label text. The
+        // searchable text is stored in userData; the "cfg-row" class lets
+        // ApplySearchFilter collect every row regardless of which builder made it.
+        private static void MarkSearchable(UITK.VisualElement row, string title)
         {
-            try
-            {
-                // Get all text content from this row - labels, text values, button text, dropdown values
-                string rowText = GetAllVisibleText(row).ToLower();
-                return rowText.Contains(searchText);
-            }
-            catch
-            {
-                return false;
-            }
+            if (row == null) return;
+            row.userData = StripRichText(title);
+            row.AddToClassList("cfg-row");
         }
 
-        private string GetAllVisibleText(VisualElement element)
+        // Strips <...> rich-text tags but keeps their inner text, so a query like
+        // "size" doesn't match the "<size=12>" markup some labels carry, while the
+        // visible hint words ("leave empty for team color") stay searchable.
+        private static string StripRichText(string s)
         {
-            System.Text.StringBuilder sb = new System.Text.StringBuilder();
-
-            // Check this element itself
-            if (element is Label label && !string.IsNullOrEmpty(label.text))
-                sb.Append(label.text).Append(" ");
-            else if (element is UITK.TextField textField && !string.IsNullOrEmpty(textField.value))
-                sb.Append(textField.value).Append(" ");
-            else if (element is Button button && !string.IsNullOrEmpty(button.text))
-                sb.Append(button.text).Append(" ");
-            else if (element is UITK.DropdownField dropdown && !string.IsNullOrEmpty(dropdown.value))
-                sb.Append(dropdown.value).Append(" ");
-
-            // Check immediate children only (not deep recursive)
-            foreach (var child in element.Children())
-            {
-                if (child is Label childLabel && !string.IsNullOrEmpty(childLabel.text))
-                    sb.Append(childLabel.text).Append(" ");
-                else if (child is UITK.TextField childTextField && !string.IsNullOrEmpty(childTextField.value))
-                    sb.Append(childTextField.value).Append(" ");
-                else if (child is Button childButton && !string.IsNullOrEmpty(childButton.text))
-                    sb.Append(childButton.text).Append(" ");
-                else if (child is UITK.DropdownField childDropdown && !string.IsNullOrEmpty(childDropdown.value))
-                    sb.Append(childDropdown.value).Append(" ");
-            }
-
-            return sb.ToString();
+            if (string.IsNullOrEmpty(s)) return "";
+            return Regex.Replace(s, "<[^>]+>", "");
         }
 
-        private void ShowAllElements(VisualElement container)
+        // Filters the active tab's rows by the SEARCH query. An empty query shows
+        // everything; a non-empty query hides non-matching rows and the section
+        // headers, so the results read as one flat list. Tabs with no rows (the
+        // button-only Presets/Tests tabs) are left untouched.
+        private void ApplySearchFilter()
         {
-            foreach (var child in container.Children())
+            var container = ActiveTabContainer();
+            if (container == null) return;
+
+            var rows = container.Query(className: "cfg-row").ToList();
+            if (rows.Count == 0) return; // nothing row-like to filter on this tab
+
+            string q = (_searchQuery ?? "").Trim().ToLowerInvariant();
+            bool searching = q.Length > 0;
+
+            foreach (var row in rows)
             {
-                child.style.display = DisplayStyle.Flex;
+                string title = (row.userData as string ?? "").ToLowerInvariant();
+                bool match = !searching || title.Contains(q);
+                row.style.display = match ? UITK.DisplayStyle.Flex : UITK.DisplayStyle.None;
             }
+
+            foreach (var header in container.Query(className: "cfg-header").ToList())
+                header.style.display = searching ? UITK.DisplayStyle.None : UITK.DisplayStyle.Flex;
         }
 
         private void RefreshUI()
         {
-            // Don't reload config from disk - just recreate UI with current config
-            // This prevents losing in-memory changes like newly added presets
+            // Don't reload config from disk - just recreate UI with current config.
+            // This prevents losing in-memory changes like newly added presets.
 
-            // Save current scroll position
+            // Remember the active tab and scroll position so a rebuild (e.g. after
+            // applying a preset from the PRESETS tab) doesn't snap the user back to
+            // GENERAL / the top of the list.
+            var prevTab = _activeTab;
             float scrollOffset = 0f;
             if (_mainScrollView != null)
             {
@@ -143,6 +96,7 @@ namespace CustomScoreboard.UI
             _isUIVisible = false;
 
             CreateUI();
+            SwitchToTab(prevTab); // CreateUI defaults to GENERAL; restore the user's tab
             ShowUI();
 
             // Restore scroll position

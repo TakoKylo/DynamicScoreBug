@@ -13,7 +13,7 @@ namespace CustomScoreboard.UI
         private void styleButton(Button button)
         {
             ForceUIFont(button);
-            button.style.backgroundColor = new StyleColor(BtnBrightGray);
+            button.style.backgroundColor = new StyleColor(ButtonBg);
             button.style.color = Color.white;
             button.style.fontSize = 14;
             button.style.unityFontStyleAndWeight = UnityEngine.FontStyle.Normal;
@@ -32,169 +32,69 @@ namespace CustomScoreboard.UI
 
         private void styleBottomButton(Button button)
         {
+            // CompAdjust footer buttons: height 50, 18px horizontal padding, RowBg
+            // fill, no explicit font size (they inherit the panel default). The 8px
+            // gap below the row comes from the panel's bottom padding.
             ForceUIFont(button);
             button.style.backgroundColor = new StyleColor(BtnBrightGray);
             button.style.color = Color.white;
-            button.style.fontSize = 24;
-            button.style.unityFontStyleAndWeight = UnityEngine.FontStyle.Normal;
             button.style.unityTextAlign = new StyleEnum<TextAnchor>(TextAnchor.MiddleCenter);
-            button.style.paddingTop = 8;
-            button.style.paddingBottom = 8;
+            button.style.whiteSpace = WhiteSpace.NoWrap;
             button.style.paddingLeft = 18;
             button.style.paddingRight = 18;
             button.style.height = 50;
             AddButtonFlash(button);
         }
 
-        private static void AddButtonFlash(Button b, int flashMs = 140)
+        // CompAdjust button hover: white fill with black text on hover; revert to
+        // the ButtonBg fill with white text on leave. No click-flash or geometry
+        // reset - the caller's initial background shows until the first hover.
+        private static void AddButtonFlash(Button b)
         {
-            var baseBg = BtnBrightGray;
-            b.focusable = true;
-
-            void SetBase()
-            {
-                b.style.backgroundColor = new StyleColor(baseBg);
-                b.style.color = Color.white;
-            }
-
-            SetBase();
-            bool hover = false, flashing = false;
-
             b.RegisterCallback<PointerEnterEvent>(_ =>
             {
-                hover = true;
                 b.style.backgroundColor = Color.white;
                 b.style.color = Color.black;
             });
-
             b.RegisterCallback<PointerLeaveEvent>(_ =>
             {
-                hover = false;
-                if (!flashing) SetBase();
+                b.style.backgroundColor = new StyleColor(ButtonBg);
+                b.style.color = Color.white;
             });
+        }
 
-            b.RegisterCallback<GeometryChangedEvent>(_ => SetBase());
-
-            b.RegisterCallback<PointerUpEvent>(_ =>
+        // CompAdjust toggle look: recolor the checkbox frame to a dark fill with a
+        // medium-gray border so it reads clearly against the dark rows. The default
+        // Unity USS draws a light box that disappears against this panel. Applied on
+        // AttachToPanel because the inner ".unity-toggle__input" element only exists
+        // once the toggle is parented.
+        private static void StyleConfigCheckbox(UITK.Toggle toggle)
+        {
+            if (toggle == null) return;
+            toggle.RegisterCallback<UITK.AttachToPanelEvent>(_ =>
             {
-                flashing = true;
-                b.style.backgroundColor = Color.white;
-                b.style.color = Color.black;
-                b.schedule.Execute(() =>
-                {
-                    flashing = false;
-                    if (!hover) SetBase();
-                }).StartingIn(flashMs);
+                var input = toggle.Q(className: "unity-toggle__input");
+                if (input == null) return;
+                input.style.backgroundColor   = new UITK.StyleColor(new Color(0.15f, 0.15f, 0.15f));
+                input.style.borderTopColor    = new UITK.StyleColor(new Color(0.4f, 0.4f, 0.4f));
+                input.style.borderBottomColor = new UITK.StyleColor(new Color(0.4f, 0.4f, 0.4f));
+                input.style.borderLeftColor   = new UITK.StyleColor(new Color(0.4f, 0.4f, 0.4f));
+                input.style.borderRightColor  = new UITK.StyleColor(new Color(0.4f, 0.4f, 0.4f));
             });
         }
 
         private void AddSection(VisualElement container, string title, int fontSize = 24)
         {
+            // CompAdjust section header: yellow-ish text, no padding, tagged
+            // "cfg-header" so the SEARCH filter can hide it while filtering.
             var section = new Label(title);
-            MakeReadable(section);
+            section.AddToClassList("cfg-header");
             section.style.fontSize = fontSize;
-            section.style.marginTop = 15;
-            section.style.marginBottom = 10;
-            section.style.paddingLeft = 5;
-            section.style.paddingBottom = 5;
+            section.style.marginTop = 16;
+            section.style.marginBottom = 8;
+            section.style.color = new Color(0.9f, 0.9f, 0.5f);
+            ForceUIFont(section);
             container.Add(section);
-        }
-
-        private void AddSliderField(VisualElement container, string label, float value, float min, float max, System.Action<float> onChange)
-        {
-            var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.marginBottom = 8;
-            row.style.paddingTop = 6;
-            row.style.paddingBottom = 6;
-            row.style.paddingLeft = 10;
-            row.style.paddingRight = 10;
-            row.style.backgroundColor = new Color(RowBg.r / 255f, RowBg.g / 255f, RowBg.b / 255f, RowBg.a / 255f);
-
-            var labelEl = new Label(label);
-            MakeReadable(labelEl);
-            labelEl.style.width = 150;
-            labelEl.style.fontSize = 13;
-            row.Add(labelEl);
-
-            var slider = new Slider(min, max);
-            slider.value = value;
-            slider.style.flexGrow = 1;
-            slider.style.marginLeft = 10;
-            slider.style.marginRight = 10;
-            row.Add(slider);
-
-            var valueLabel = new Label(value.ToString("F1"));
-            MakeReadable(valueLabel);
-            valueLabel.style.width = 40;
-            valueLabel.style.fontSize = 12;
-            valueLabel.style.unityTextAlign = TextAnchor.MiddleRight;
-            row.Add(valueLabel);
-
-            slider.RegisterValueChangedCallback(evt => 
-            {
-                onChange(evt.newValue);
-                valueLabel.text = evt.newValue.ToString("F1");
-            });
-
-            container.Add(row);
-        }
-
-        private void AddTextFieldRow(VisualElement container, string label, string value, System.Action<string> onChange)
-        {
-            var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.marginBottom = 8;
-            row.style.paddingTop = 6;
-            row.style.paddingBottom = 6;
-            row.style.paddingLeft = 10;
-            row.style.paddingRight = 10;
-            row.style.backgroundColor = new Color(RowBg.r / 255f, RowBg.g / 255f, RowBg.b / 255f, RowBg.a / 255f);
-
-            var labelEl = new Label(label);
-            MakeReadable(labelEl);
-            labelEl.style.width = 150;
-            labelEl.style.fontSize = 13;
-            row.Add(labelEl);
-
-            var textField = new TextField();
-            textField.value = value;
-            MakeReadable(textField);
-            textField.style.flexGrow = 1;
-            textField.style.marginLeft = 10;
-            textField.RegisterValueChangedCallback(evt => onChange(evt.newValue));
-            row.Add(textField);
-
-            container.Add(row);
-        }
-
-        private void AddToggleField(VisualElement container, string label, bool value, System.Action<bool> onChange)
-        {
-            var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-            row.style.marginBottom = 8;
-            row.style.paddingTop = 6;
-            row.style.paddingBottom = 6;
-            row.style.paddingLeft = 10;
-            row.style.paddingRight = 10;
-            row.style.backgroundColor = new Color(RowBg.r / 255f, RowBg.g / 255f, RowBg.b / 255f, RowBg.a / 255f);
-
-            var labelEl = new Label(label);
-            MakeReadable(labelEl);
-            labelEl.style.width = 150;
-            labelEl.style.fontSize = 13;
-            row.Add(labelEl);
-
-            var toggle = new Toggle();
-            toggle.value = value;
-            toggle.style.marginLeft = 10;
-            toggle.RegisterValueChangedCallback(evt => onChange(evt.newValue));
-            row.Add(toggle);
-
-            container.Add(row);
         }
     }
 }
