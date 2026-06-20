@@ -18,8 +18,8 @@ namespace CustomScoreboard.UI
             // Only start log monitoring as a fallback if reflection approach doesn't work
             try
             {
-                // First, try the reflection approach to see if Stats mod is available
-                var statsType = System.Type.GetType("oomtm450PuckMod_Stats.Stats, oomtm450PuckMod_Stats");
+                // First, try the reflection approach to see if a supported Stats mod is available
+                var statsType = ResolveStatsModType();
                 if (statsType != null)
                 {
                     DebugLog("Stats mod detected - using direct memory access (no log monitoring needed)");
@@ -314,6 +314,96 @@ namespace CustomScoreboard.UI
             }
         }
         
+        // Resolves the active Stats mod's main type across the known forks. They all ship the
+        // same wire format and a private static `_sog` LockDictionary, but under different
+        // assembly/namespace names: oomtm450's "oomtm450PuckMod_Stats" and Dalfan's "StatsTooltip".
+        // Result is cached; a one-time assembly scan covers any future rename.
+        private static System.Type _resolvedStatsType;
+        private static bool _scannedAssembliesForStats;
+
+        private System.Type ResolveStatsModType()
+        {
+            if (_resolvedStatsType != null) return _resolvedStatsType;
+
+            // Cheap path: known assembly-qualified names.
+            _resolvedStatsType = System.Type.GetType("oomtm450PuckMod_Stats.Stats, oomtm450PuckMod_Stats")
+                              ?? System.Type.GetType("StatsTooltip.Stats, StatsTooltip");
+            if (_resolvedStatsType != null) return _resolvedStatsType;
+
+            // Expensive fallback, done at most once: any "Stats" type exposing a static _sog field.
+            if (_scannedAssembliesForStats) return null;
+            _scannedAssembliesForStats = true;
+            try
+            {
+                foreach (var asm in System.AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    System.Type[] types;
+                    try { types = asm.GetTypes(); }
+                    catch { continue; }
+                    foreach (var t in types)
+                    {
+                        if (t.Name == "Stats" &&
+                            t.GetField("_sog", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static) != null)
+                        {
+                            _resolvedStatsType = t;
+                            return t;
+                        }
+                    }
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        // Reads per-player shots from ToastersRinkCompanion, which keeps its OWN stats store
+        // (independent of the oomtm/Dalfan Stats mod) and is the only SOG source on Toasters Rink
+        // servers. Feeds the same playerSOG dictionary so the team-total summation is source-agnostic.
+        private static System.Reflection.MethodInfo _trcGetStats;
+        private static System.Reflection.FieldInfo _trcShotsField;
+
+        private void UpdateStatsFromToastersRink()
+        {
+            try
+            {
+                // Resolve once and cache. Only latch on success so a late-loading TRC assembly
+                // (mod load-order) is still picked up on a later tick instead of being locked out.
+                if (_trcGetStats == null)
+                {
+                    var storeType = System.Type.GetType("ToastersRinkCompanion.modifiers.PlayerStatsStore, ToastersRinkCompanion");
+                    if (storeType != null)
+                        _trcGetStats = storeType.GetMethod("GetStats", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                    if (_trcGetStats == null) return; // TRC not loaded (yet) — retry on a later tick
+                }
+
+                var playerManager = GetPlayerManager();
+                if (playerManager == null) return;
+
+                foreach (var player in playerManager.GetPlayers(false))
+                {
+                    string steamId = player.SteamId.Value.ToString();
+                    var entry = _trcGetStats.Invoke(null, new object[] { steamId });
+                    if (entry == null) continue; // no stats for this player yet
+
+                    if (_trcShotsField == null)
+                        _trcShotsField = entry.GetType().GetField("shots");
+                    if (_trcShotsField == null) return; // shape changed — give up quietly
+
+                    int shots = Convert.ToInt32(_trcShotsField.GetValue(entry));
+                    // Keep the higher value, matching ReadStatsField. Locked on playerHits — the
+                    // log-monitor thread can write playerSOG concurrently on the fallback path.
+                    lock (playerHits)
+                    {
+                        if (!playerSOG.ContainsKey(steamId) || playerSOG[steamId] < shots)
+                            playerSOG[steamId] = shots;
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                DebugLog($"Error reading ToastersRinkCompanion stats: {ex.Message}");
+            }
+        }
+
         // Use reflection to access Stats mod's private LockDictionary fields
         // Stats mod v0.7.1+ fields: _sog, _shotAttempts, _savePerc, _stickSaves, _bodySaves, _blocks, _hits, 
         // _takeaways, _turnovers, _passes, _puckTouches, _exits, _entries, _possessionTimeSeconds, 
@@ -322,8 +412,9 @@ namespace CustomScoreboard.UI
         {
             try
             {
-                // Find the Stats class from the oomtm450PuckMod_Stats assembly
-                var statsType = System.Type.GetType("oomtm450PuckMod_Stats.Stats, oomtm450PuckMod_Stats");
+                // Find the Stats class from a supported stats mod (oomtm450 Stats or the
+                // "StatsTooltip" fork — both expose the same private static _sog dictionary).
+                var statsType = ResolveStatsModType();
                 if (statsType == null)
                 {
                     DebugLog("Stats mod type not found via reflection");
@@ -370,13 +461,18 @@ namespace CustomScoreboard.UI
             {
                 var dict = UnwrapLockDictionary(field);
                 if (dict == null) return;
-                foreach (System.Collections.DictionaryEntry entry in dict)
+                // playerHits is the shared monitor for all stat dictionaries (the log-monitor thread
+                // writes them under the same lock); guard the read-modify-write against that thread.
+                lock (playerHits)
                 {
-                    string key = entry.Key.ToString();
-                    int value = Convert.ToInt32(entry.Value);
-                    // Keep the higher value (Stats mod has authoritative data)
-                    if (!targetDict.ContainsKey(key) || targetDict[key] < value)
-                        targetDict[key] = value;
+                    foreach (System.Collections.DictionaryEntry entry in dict)
+                    {
+                        string key = entry.Key.ToString();
+                        int value = Convert.ToInt32(entry.Value);
+                        // Keep the higher value (Stats mod has authoritative data)
+                        if (!targetDict.ContainsKey(key) || targetDict[key] < value)
+                            targetDict[key] = value;
+                    }
                 }
             }
             catch (Exception ex)
@@ -411,16 +507,20 @@ namespace CustomScoreboard.UI
             {
                 var dict = UnwrapLockDictionary(field);
                 if (dict == null) return;
-                foreach (System.Collections.DictionaryEntry entry in dict)
+                // goalieSaveStats is also written by the log-monitor thread under lock(playerHits).
+                lock (playerHits)
                 {
-                    // Value is ValueTuple<int, int> with named fields (Saves, Shots) — try named, fall back to Item1/Item2.
-                    var tupleType = entry.Value.GetType();
-                    var savesField = tupleType.GetField("Saves") ?? tupleType.GetField("Item1");
-                    var shotsField = tupleType.GetField("Shots") ?? tupleType.GetField("Item2");
-                    if (savesField == null || shotsField == null) continue;
-                    int saves = Convert.ToInt32(savesField.GetValue(entry.Value));
-                    int shots = Convert.ToInt32(shotsField.GetValue(entry.Value));
-                    goalieSaveStats[entry.Key.ToString()] = (saves, shots);
+                    foreach (System.Collections.DictionaryEntry entry in dict)
+                    {
+                        // Value is ValueTuple<int, int> with named fields (Saves, Shots) — try named, fall back to Item1/Item2.
+                        var tupleType = entry.Value.GetType();
+                        var savesField = tupleType.GetField("Saves") ?? tupleType.GetField("Item1");
+                        var shotsField = tupleType.GetField("Shots") ?? tupleType.GetField("Item2");
+                        if (savesField == null || shotsField == null) continue;
+                        int saves = Convert.ToInt32(savesField.GetValue(entry.Value));
+                        int shots = Convert.ToInt32(shotsField.GetValue(entry.Value));
+                        goalieSaveStats[entry.Key.ToString()] = (saves, shots);
+                    }
                 }
             }
             catch (Exception ex)

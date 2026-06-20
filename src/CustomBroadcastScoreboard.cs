@@ -345,6 +345,8 @@ namespace CustomScoreboard.UI
                         if (currentPhase == GamePhase.Play || currentPhase == GamePhase.FaceOff)
                         {
                             UpdateStatsFromStatsMod();
+                            UpdateStatsFromToastersRink();
+                            UpdateTeamShotsFromPlayerSOG();
                         }
                     }
                     
@@ -856,6 +858,26 @@ namespace CustomScoreboard.UI
             playerGoals.Clear();
             cachedPlayerStats.Clear();
             hasShownWinAnimation = false;
+
+            // Clear the Stats-mod dictionaries too (mirrors the Warmup reset in Event_OnGamePhaseChanged).
+            // Without this, the keep-higher ratchet freezes per-player SOG, so the live team totals
+            // jump straight back to the pre-reset values. playerHits is the shared monitor.
+            lock (playerHits)
+            {
+                playerHits.Clear();
+                playerPasses.Clear();
+                playerTakeaways.Clear();
+                playerTurnovers.Clear();
+                playerBlocks.Clear();
+                goalieSaveStats.Clear();
+                playerSOG.Clear();
+                playerStickSaves.Clear();
+                playerBodySaves.Clear();
+                playerPlusMinus.Clear();
+                playerPuckBattleWins.Clear();
+                playerPuckBattleLosses.Clear();
+                playerTimeOnIce.Clear();
+            }
             
             // Reset shootout data
             blueShootoutGoals = 0;

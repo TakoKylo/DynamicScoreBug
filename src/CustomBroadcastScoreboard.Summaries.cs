@@ -174,12 +174,16 @@ namespace CustomScoreboard.UI
                     ulong clientId = player.OwnerClientId;
                     string steamId = player.SteamId.Value.ToString();
                     
-                    // Get shots from playerSOG (by Steam ID) first, fallback to playerShots (by client ID)
+                    // Get shots from playerSOG (by Steam ID) first, fallback to playerShots (by client ID).
+                    // Locked on playerHits — the log-monitor thread can write playerSOG concurrently.
                     int shots = 0;
-                    if (playerSOG.ContainsKey(steamId))
-                        shots = playerSOG[steamId];
-                    else if (playerShots.ContainsKey(clientId))
-                        shots = playerShots[clientId];
+                    lock (playerHits)
+                    {
+                        if (playerSOG.TryGetValue(steamId, out int sogValue))
+                            shots = sogValue;
+                        else if (playerShots.TryGetValue(clientId, out int shotsValue))
+                            shots = shotsValue;
+                    }
                     
                     // Calculate shooting percentage (only if we have shot data)
                     float shootPct = 0f;

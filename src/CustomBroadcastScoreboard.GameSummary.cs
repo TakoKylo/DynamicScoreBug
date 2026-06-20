@@ -375,8 +375,11 @@ namespace CustomScoreboard.UI
                     ulong clientId = player.OwnerClientId;
                     string steamId = player.SteamId.Value.ToString();
                     int shots = 0;
-                    if (playerSOG.ContainsKey(steamId)) shots = playerSOG[steamId];
-                    else if (playerShots.ContainsKey(clientId)) shots = playerShots[clientId];
+                    lock (playerHits)
+                    {
+                        if (playerSOG.TryGetValue(steamId, out int sogValue)) shots = sogValue;
+                        else if (playerShots.TryGetValue(clientId, out int shotsValue)) shots = shotsValue;
+                    }
 
                     string positionName = GetPlayerPositionName(player);
                     cachedPlayerStats[clientId] = (
@@ -411,8 +414,14 @@ namespace CustomScoreboard.UI
                 if (roster.Any(p => p.Item6 == kvp.Key)) continue;
 
                 int cachedShots = kvp.Value.shots;
-                if (!string.IsNullOrEmpty(kvp.Value.steamId) && playerSOG.ContainsKey(kvp.Value.steamId))
-                    cachedShots = playerSOG[kvp.Value.steamId];
+                if (!string.IsNullOrEmpty(kvp.Value.steamId))
+                {
+                    lock (playerHits)
+                    {
+                        if (playerSOG.TryGetValue(kvp.Value.steamId, out int sogValue))
+                            cachedShots = sogValue;
+                    }
+                }
 
                 roster.Add((
                     kvp.Value.name,

@@ -128,6 +128,7 @@ namespace CustomScoreboard.UI
                 
                 // CRITICAL: Update Stats mod data IMMEDIATELY before dictionaries are cleared
                 UpdateStatsFromStatsMod();
+                UpdateStatsFromToastersRink();
                 DebugLog("*** CRITICAL: Stats captured at GameOver phase start ***");
                 
                 // Priority: Shootout win > Shutout > Regular win
@@ -189,6 +190,7 @@ namespace CustomScoreboard.UI
                             
                             // Update Stats mod data IMMEDIATELY before it gets cleared
                             UpdateStatsFromStatsMod();
+                            UpdateStatsFromToastersRink();
                             DebugLog("[CustomScoreboard] Updated Stats mod data before game end");
                             
                             DebugLog("[CustomScoreboard] About to call ShowEndOfGameSummary");
@@ -386,8 +388,13 @@ namespace CustomScoreboard.UI
             lastBlueScore = gameState.BlueScore;
             lastRedScore = gameState.RedScore;
 
-            // Try to manually trigger shot update by checking Stats mod
-            TryUpdateShotsFromStatsMod();
+            // Recompute team shot totals from the authoritative per-player SOG (playerSOG is
+            // refreshed every 5s by the periodic loop). Fall back to the brittle UIScoreboard
+            // label scrape only when no Stats data is available for the current roster.
+            if (!UpdateTeamShotsFromPlayerSOG())
+            {
+                TryUpdateShotsFromStatsMod();
+            }
             }
             catch (Exception ex)
             {
@@ -736,6 +743,59 @@ namespace CustomScoreboard.UI
             catch (System.Exception ex)
             {
                 DebugWarning($"[CustomScoreboard] Error parsing SOG data: {ex.Message}");
+            }
+        }
+
+        // Authoritative live team-total producer: sums the per-player SOG the mod already
+        // collects reliably — playerSOG (by SteamId, from the Stats-mod reflection in
+        // UpdateStatsFromStatsMod) with playerShots (by clientId, from BATCHSOG) as the same
+        // fallback the end-of-game summaries use. Unlike TryUpdateShotsFromStatsMod, this never
+        // reads native UIScoreboard label positions, so it is immune to other mods (Toaster*,
+        // RinkCompanion, etc.) reordering/renaming the player rows.
+        // Returns true when it found Stats data and updated the totals; false when no current
+        // player has shot data yet, so the caller can fall back to the UI scrape.
+        private bool UpdateTeamShotsFromPlayerSOG()
+        {
+            try
+            {
+                var playerManager = GetPlayerManager();
+                if (playerManager == null) return false;
+
+                var players = playerManager.GetPlayers(false);
+                int blue = 0, red = 0;
+                bool anyData = false;
+
+                // playerHits is the shared monitor guarding playerSOG against the log-monitor thread.
+                lock (playerHits)
+                {
+                    foreach (var player in players)
+                    {
+                        string steamId = player.SteamId.Value.ToString();
+                        ulong clientId = player.OwnerClientId;
+
+                        int shots = 0;
+                        if (playerSOG.TryGetValue(steamId, out int sogValue)) { shots = sogValue; anyData = true; }
+                        else if (playerShots.TryGetValue(clientId, out int shotsValue)) { shots = shotsValue; anyData = true; }
+
+                        if (player.Team == PlayerTeam.Blue) blue += shots;
+                        else if (player.Team == PlayerTeam.Red) red += shots;
+                    }
+                }
+
+                // No data for any current player yet (Stats source absent, or no SOG sent yet).
+                // Report failure so the UI-scrape fallback can try instead of zeroing a real total.
+                if (!anyData) return false;
+
+                // Direct assignment (NOT a max ratchet) so totals self-heal on roster changes,
+                // and only touch the label when the value actually changed (avoids log spam).
+                if (blue != blueTeamShots) { blueTeamShots = blue; SetBlueShots(blue); }
+                if (red != redTeamShots) { redTeamShots = red; SetRedShots(red); }
+                return true;
+            }
+            catch (System.Exception ex)
+            {
+                DebugWarning($"[CustomScoreboard] Error in UpdateTeamShotsFromPlayerSOG: {ex.Message}");
+                return false;
             }
         }
 
